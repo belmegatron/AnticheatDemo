@@ -5,11 +5,10 @@
 
 GlobalState g_state;
 
-#define POOL_TAG 'derp'
+#define POOL_TAG 'ca'
 
 #define PROCESS_VM_READ 0x0010
 #define PROCESS_VM_WRITE  0x0020
-#define PROCESS_QUERY_INFORMATION 0x0400
 
 void OnProcessNotify(PEPROCESS process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO create_info)
 {
@@ -40,6 +39,136 @@ void OnProcessNotify(PEPROCESS process, HANDLE process_id, PPS_CREATE_NOTIFY_INF
     }
 }
 
+PSYSTEM_PROCESSES ProcessList()
+{
+    ULONG bufferSize = 0;
+    NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, nullptr, 0, &bufferSize);
+    if (status == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        void* buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
+        if (buf)
+        {
+            status = ZwQuerySystemInformation(SystemProcessInformation, buf, bufferSize, &bufferSize);
+            if (NT_SUCCESS(status))
+            {
+                return reinterpret_cast<PSYSTEM_PROCESSES>(buf);
+            }
+
+            ExFreePoolWithTag(buf, POOL_TAG);
+        }
+    }
+
+    return nullptr;
+}
+
+PSYSTEM_HANDLE_INFORMATION_EX  HandleList()
+{
+    ULONG bufferSize = sizeof(SYSTEM_HANDLE_INFORMATION_EX);
+    NTSTATUS status = STATUS_INVALID_HANDLE;
+    void* buf = nullptr;
+
+    do
+    {
+        if (buf)
+        {
+            ExFreePoolWithTag(buf, POOL_TAG);
+            buf = nullptr;
+        }
+
+        buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
+
+        status = ZwQuerySystemInformation(SystemExtendedHandleInformation, buf, bufferSize, &bufferSize);
+
+    } while (status == STATUS_INFO_LENGTH_MISMATCH);
+
+    if (NT_SUCCESS(status))
+    {
+        return reinterpret_cast<PSYSTEM_HANDLE_INFORMATION_EX>(buf);
+    }
+    else
+    {
+        if (buf)
+        {
+            ExFreePoolWithTag(buf, POOL_TAG);
+        }
+    }
+
+    return nullptr;
+}
+
+PSYSTEM_PROCESSES FindProcess(PSYSTEM_PROCESSES process_list, unsigned long pid)
+{
+    PSYSTEM_PROCESSES entry = process_list;
+
+    do
+    {
+        if (entry->ProcessId == pid)
+        {
+            return entry;
+        }
+
+        entry = (PSYSTEM_PROCESSES)((char*)entry + entry->NextEntryDelta);
+
+    } while (entry->NextEntryDelta);
+
+    return nullptr;
+}
+
+void MemoryScanRoutine(PVOID context)
+{
+    UNREFERENCED_PARAMETER(context);
+
+    // TODO: DriverUnload needs to signal this thread to terminate.
+
+    while (true)
+    {
+        NTSTATUS status = KeWaitForSingleObject(&g_state.timer, Executive, KernelMode, true, nullptr);
+
+        if (NT_SUCCESS(status))
+        {
+            auto process_list = ProcessList();
+
+            if (!process_list)
+            {
+                KdPrint(("Failed to perform initial process list when executing memory scan"));
+                continue;
+            }
+
+            KdPrint(("Executing memory scan routine."));
+
+            PSYSTEM_HANDLE_INFORMATION_EX handle_information = HandleList();
+
+            if (handle_information)
+            {
+                for (unsigned int i = 0; i < handle_information->NumberOfHandles; ++i)
+                {
+                    auto handle = handle_information->Handles[i];
+
+                    if (g_state.process == handle.Object)
+                    {
+                        auto process = FindProcess(process_list, handle.UniqueProcessId);
+                        if (process)
+                        {
+                            KdPrint(("Process: %wZ, Access: %x", process->ProcessName, handle.GrantedAccess));
+                        }
+                    }
+                }
+
+                ExFreePoolWithTag(handle_information, POOL_TAG);
+            }
+            ExFreePoolWithTag(process_list, POOL_TAG);
+        }
+    }
+}
+
+void SetupMemoryScanRoutine()
+{
+    KeInitializeTimerEx(&g_state.timer, SynchronizationTimer);
+    LARGE_INTEGER interval{ 10000 , 0 };
+    KeSetTimerEx(&g_state.timer, interval, 30000, nullptr);
+    PsCreateSystemThread(&g_state.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+}
+
 OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION info)
 {
     if (info->KernelHandle)
@@ -59,66 +188,57 @@ OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION i
 
     if (requesting_pid != g_state.pid)
     {
-        ULONG bufferSize = 0;
-
         bool allow_handle_access = false;
 
-        NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, nullptr, 0, &bufferSize);
-        if (status == STATUS_INFO_LENGTH_MISMATCH)
+        PSYSTEM_PROCESSES process_list = ProcessList();
+
+        if (process_list)
         {
-            void* buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
-            if (buf)
+            PSYSTEM_PROCESSES entry = process_list;
+
+            do
             {
-                status = ZwQuerySystemInformation(SystemProcessInformation, buf, bufferSize, &bufferSize);
-                if (NT_SUCCESS(status))
+                if (entry->ProcessName.Length)
                 {
-                    PSYSTEM_PROCESSES processEntry = reinterpret_cast<PSYSTEM_PROCESSES>(buf);
-                    do 
+                    // TODO: Perform some kind of integrity check here.
+
+                    if (wcsstr(entry->ProcessName.Buffer, L"csrss.exe"))
                     {
-                        if (processEntry->ProcessName.Length) 
+                        if (ULongToHandle(entry->ProcessId) == requesting_pid)
                         {
-                            // TODO: Perform some kind of integrity check here.
-
-                            if (wcsstr(processEntry->ProcessName.Buffer, L"csrss.exe"))
-                            {
-                                if (ULongToHandle(processEntry->ProcessId) == requesting_pid)
-                                {
-                                    allow_handle_access = true;
-                                    break;
-                                }
-                            }
-
-                            // TODO: Perform some kind of integrity check here.
-
-                            if (wcsstr(processEntry->ProcessName.Buffer, L"explorer.exe"))
-                            {
-                                if (ULongToHandle(processEntry->ProcessId) == requesting_pid)
-                                {
-                                    allow_handle_access = true;
-                                    break;
-                                }
-                            }
+                            allow_handle_access = true;
+                            break;
                         }
-                        processEntry = (PSYSTEM_PROCESSES)((char*)processEntry + processEntry->NextEntryDelta);
-                    } while (processEntry->NextEntryDelta);
+                    }
 
-                    if (!allow_handle_access)
+                    // TODO: Perform some kind of integrity check here.
+
+                    if (wcsstr(entry->ProcessName.Buffer, L"explorer.exe"))
                     {
-                        KdPrint(("Denied RW Memory access to notepad.exe"));
-                        unsigned long mask = PROCESS_VM_READ | PROCESS_VM_WRITE;
-
-                        if (info->Operation == OB_OPERATION_HANDLE_CREATE)
+                        if (ULongToHandle(entry->ProcessId) == requesting_pid)
                         {
-                            info->Parameters->CreateHandleInformation.DesiredAccess &= ~mask;
-                        }
-                        else if (info->Operation == OB_OPERATION_HANDLE_DUPLICATE)
-                        {
-                            info->Parameters->DuplicateHandleInformation.DesiredAccess &= ~mask;
+                            allow_handle_access = true;
+                            break;
                         }
                     }
                 }
+                entry = (PSYSTEM_PROCESSES)((char*)entry + entry->NextEntryDelta);
+            } while (entry->NextEntryDelta);
 
-                ExFreePoolWithTag(buf, POOL_TAG);
+            ExFreePoolWithTag(process_list, POOL_TAG);
+        }
+
+        if (!allow_handle_access)
+        {
+            unsigned long mask = PROCESS_VM_READ | PROCESS_VM_WRITE;
+
+            if (info->Operation == OB_OPERATION_HANDLE_CREATE)
+            {
+                info->Parameters->CreateHandleInformation.DesiredAccess &= ~mask;
+            }
+            else if (info->Operation == OB_OPERATION_HANDLE_DUPLICATE)
+            {
+                info->Parameters->DuplicateHandleInformation.DesiredAccess &= ~mask;
             }
         }
     }
@@ -139,6 +259,8 @@ NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp)
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object)
 {
+    KeCancelTimer(&g_state.timer);
+
     ObUnRegisterCallbacks(g_state.reg_handle);
 
     PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, true);
@@ -218,7 +340,7 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
                     p_driver_object->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
                     p_driver_object->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
 
-                    // TODO: Add read function here!
+                    SetupMemoryScanRoutine();
                 }
             }
             else
@@ -249,4 +371,5 @@ void GlobalState::Init()
     pid = 0;
     process = nullptr;
     reg_handle = nullptr;
+    thread = nullptr;
 }
