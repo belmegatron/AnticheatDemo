@@ -7,6 +7,10 @@ GlobalState g_state;
 
 #define POOL_TAG 'derp'
 
+#define PROCESS_VM_READ 0x0010
+#define PROCESS_VM_WRITE  0x0020
+#define PROCESS_QUERY_INFORMATION 0x0400
+
 void OnProcessNotify(PEPROCESS process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO create_info)
 {
     if (create_info)
@@ -69,7 +73,6 @@ OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION i
                 if (NT_SUCCESS(status))
                 {
                     PSYSTEM_PROCESSES processEntry = reinterpret_cast<PSYSTEM_PROCESSES>(buf);
-
                     do 
                     {
                         if (processEntry->ProcessName.Length) 
@@ -98,17 +101,25 @@ OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION i
                         }
                         processEntry = (PSYSTEM_PROCESSES)((char*)processEntry + processEntry->NextEntryDelta);
                     } while (processEntry->NextEntryDelta);
+
+                    if (!allow_handle_access)
+                    {
+                        KdPrint(("Denied RW Memory access to notepad.exe"));
+                        unsigned long mask = PROCESS_VM_READ | PROCESS_VM_WRITE;
+
+                        if (info->Operation == OB_OPERATION_HANDLE_CREATE)
+                        {
+                            info->Parameters->CreateHandleInformation.DesiredAccess &= ~mask;
+                        }
+                        else if (info->Operation == OB_OPERATION_HANDLE_DUPLICATE)
+                        {
+                            info->Parameters->DuplicateHandleInformation.DesiredAccess &= ~mask;
+                        }
+                    }
                 }
 
                 ExFreePoolWithTag(buf, POOL_TAG);
             }
-        }
-
-        if (!allow_handle_access)
-        {
-            info->Parameters->CreateHandleInformation.DesiredAccess = 0;
-            info->Parameters->DuplicateHandleInformation.DesiredAccess = 0;
-            KdPrint(("Denied access to notepad.exe process handle"));
         }
     }
 
