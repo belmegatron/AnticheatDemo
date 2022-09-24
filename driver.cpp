@@ -10,6 +10,11 @@ GlobalState g_state;
 #define PROCESS_VM_READ 0x0010
 #define PROCESS_VM_WRITE  0x0020
 
+#define MEM_IMAGE 0x1000000
+#define FREE 0x0000000
+
+#define NONE 0x00
+
 void OnProcessNotify(PEPROCESS process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO create_info)
 {
     if (create_info)
@@ -96,7 +101,7 @@ PSYSTEM_HANDLE_INFORMATION_EX  HandleList()
     return nullptr;
 }
 
-PSYSTEM_PROCESSES FindProcess(PSYSTEM_PROCESSES process_list, unsigned long pid)
+PSYSTEM_PROCESSES FindProcess(PSYSTEM_PROCESSES process_list, ULONG_PTR pid)
 {
     PSYSTEM_PROCESSES entry = process_list;
 
@@ -109,10 +114,127 @@ PSYSTEM_PROCESSES FindProcess(PSYSTEM_PROCESSES process_list, unsigned long pid)
 
         entry = (PSYSTEM_PROCESSES)((char*)entry + entry->NextEntryDelta);
 
-    } while (entry->NextEntryDelta);
+    } while (entry->ProcessId);
 
     return nullptr;
 }
+
+void PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)
+{
+    PWCHAR protect = nullptr;
+    PWCHAR type = nullptr;
+
+    switch (p_info->Protect)
+    {
+    case PAGE_EXECUTE:
+        protect = L"PAGE_EXECUTE";
+        break;
+    case PAGE_EXECUTE_READ:
+        protect = L"PAGE_EXECUTE_READ";
+        break;
+    case PAGE_EXECUTE_READWRITE:
+        protect = L"PAGE_EXECUTE_READWRITE";
+        break;
+    case PAGE_EXECUTE_WRITECOPY:
+        protect = L"PAGE_EXECUTE_WRITECOPY";
+        break;
+    case PAGE_READONLY:
+        protect = L"PAGE_READONLY";
+        break;
+    case PAGE_READWRITE:
+    case PAGE_READWRITE | PAGE_GUARD:
+        protect = L"PAGE_READWRITE";
+        break;
+    case PAGE_WRITECOPY:
+        protect = L"PAGE_WRITECOPY";
+        break;
+    case PAGE_NOACCESS:
+        protect = L"PAGE_NOACCESS";
+        break;
+    case NONE:
+        protect = L"";
+        break;
+    default:
+        KdPrint(("Protect: %x", p_info->Protect));
+        protect = L"UNKNOWN";
+    }
+
+    switch (p_info->Type)
+    {
+    case MEM_PRIVATE:
+        type = L"MEM_PRIVATE";
+        break;
+    case MEM_MAPPED:
+        type = L"MEM_MAPPED";
+        break;
+    case MEM_IMAGE:
+        type = L"MEM_IMAGE";
+        break;
+    case FREE:
+        type = L"FREE";
+        break;
+    default:
+        KdPrint(("Type: %x", p_info->Type));
+        type = L"UNKNOWN";
+    }
+
+    KdPrint(("Base Address: 0x%Ix, Page Protection: %ws, Type: %ws", p_info->BaseAddress, protect, type));
+}
+
+void ScanMemoryRegions(PSYSTEM_PROCESSES process_list)
+{
+    if (g_state.pid == 0)
+    {
+        return;
+    }
+
+    KdPrint(("Starting memory region scan"));
+
+    auto process = FindProcess(process_list, reinterpret_cast<ULONG_PTR>(g_state.pid));
+    if (!process)
+    {
+        KdPrint(("Unable to find target process when performing memory region scan: %i", g_state.pid));
+        return;
+    }
+
+    CLIENT_ID client_id = {};
+
+    client_id.UniqueProcess = g_state.pid;
+    client_id.UniqueThread = 0;
+
+    HANDLE process_handle;
+    OBJECT_ATTRIBUTES attributes;
+    InitializeObjectAttributes(&attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
+
+    NTSTATUS status = ZwOpenProcess(&process_handle, GENERIC_ALL, &attributes, &client_id);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("Unable to open handle to notepad.exe: %x", status));
+        return;
+    }
+
+    KdPrint(("Obtained handle to target process"));
+
+    MEMORY_BASIC_INFORMATION info = {};
+    ULONG_PTR base = 0;
+
+    SIZE_T ReturnLength = 0;
+
+    do
+    {
+        status = ZwQueryVirtualMemory(process_handle, (PVOID)base, MemoryBasicInformation, &info, sizeof(info), &ReturnLength);
+        if (NT_SUCCESS(status))
+        {
+            PrintMemoryAllocation(&info);
+        }
+
+        base += info.RegionSize;
+        RtlSecureZeroMemory(&info, sizeof(info));
+
+    } while (NT_SUCCESS(status));
+
+}
+
 
 void MemoryScanRoutine(PVOID context)
 {
@@ -149,6 +271,7 @@ void MemoryScanRoutine(PVOID context)
                         auto process = FindProcess(process_list, handle.UniqueProcessId);
                         if (process)
                         {
+                            // TODO: Perform lookup on access values maybe?
                             KdPrint(("Process: %wZ, Access: %x", process->ProcessName, handle.GrantedAccess));
                         }
                     }
@@ -156,6 +279,9 @@ void MemoryScanRoutine(PVOID context)
 
                 ExFreePoolWithTag(handle_information, POOL_TAG);
             }
+
+            ScanMemoryRegions(process_list);
+
             ExFreePoolWithTag(process_list, POOL_TAG);
         }
     }

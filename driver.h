@@ -1,22 +1,16 @@
 #pragma once
 #include <ntddk.h>
 
-typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO
-{
-    USHORT UniqueProcessId;
-    USHORT CreatorBackTraceIndex;
-    UCHAR ObjectTypeIndex;
-    UCHAR HandleAttributes;
-    USHORT HandleValue;
-    PVOID Object;
-    ULONG GrantedAccess;
-} SYSTEM_HANDLE_TABLE_ENTRY_INFO, * PSYSTEM_HANDLE_TABLE_ENTRY_INFO;
-
-typedef struct _SYSTEM_HANDLE_INFORMATION
-{
-    ULONG NumberOfHandles;
-    SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
-} SYSTEM_HANDLE_INFORMATION, * PSYSTEM_HANDLE_INFORMATION;
+typedef struct _MEMORY_BASIC_INFORMATION {
+    PVOID  BaseAddress;
+    PVOID  AllocationBase;
+    ULONG  AllocationProtect;
+    USHORT PartitionId;
+    SIZE_T RegionSize;
+    ULONG  State;
+    ULONG  Protect;
+    ULONG  Type;
+} MEMORY_BASIC_INFORMATION, * PMEMORY_BASIC_INFORMATION;
 
 typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX
 {
@@ -93,13 +87,19 @@ ZwQuerySystemInformation(
     ULONG SystemInformationLength,
     ULONG * ReturnLength);
 
-extern "C"
-NTSTATUS
-NtQuerySystemInformation(
-    SYSTEM_INFORMATION_CLASS SystemInformationClass,
-    PVOID SystemInformation,
-    ULONG SystemInformationLength,
-    ULONG * ReturnLength);
+typedef enum _MEMORY_INFORMATION_CLASS {
+    MemoryBasicInformation
+} MEMORY_INFORMATION_CLASS;
+
+extern "C" 
+NTSTATUS ZwQueryVirtualMemory(
+    HANDLE                   ProcessHandle,
+    PVOID                    BaseAddress,
+    MEMORY_INFORMATION_CLASS MemoryInformationClass,
+    PVOID                    MemoryInformation,
+    SIZE_T                   MemoryInformationLength,
+    PSIZE_T                  ReturnLength
+);
 
 struct GlobalState
 {
