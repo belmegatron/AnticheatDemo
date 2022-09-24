@@ -59,7 +59,7 @@ OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION i
 
         bool allow_handle_access = false;
 
-        NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, NULL, 0, &bufferSize);
+        NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, nullptr, 0, &bufferSize);
         if (status == STATUS_INFO_LENGTH_MISMATCH)
         {
             void* buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
