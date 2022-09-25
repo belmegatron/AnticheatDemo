@@ -79,6 +79,10 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemPolicyInformation = 134,
 } SYSTEM_INFORMATION_CLASS;
 
+typedef enum _MEMORY_INFORMATION_CLASS {
+    MemoryBasicInformation
+} MEMORY_INFORMATION_CLASS;
+
 extern "C"
 NTSTATUS
 ZwQuerySystemInformation(
@@ -87,11 +91,7 @@ ZwQuerySystemInformation(
     ULONG SystemInformationLength,
     ULONG * ReturnLength);
 
-typedef enum _MEMORY_INFORMATION_CLASS {
-    MemoryBasicInformation
-} MEMORY_INFORMATION_CLASS;
-
-extern "C" 
+extern "C"
 NTSTATUS ZwQueryVirtualMemory(
     HANDLE                   ProcessHandle,
     PVOID                    BaseAddress,
@@ -100,16 +100,3 @@ NTSTATUS ZwQueryVirtualMemory(
     SIZE_T                   MemoryInformationLength,
     PSIZE_T                  ReturnLength
 );
-
-struct GlobalState
-{
-    HANDLE pid;
-    PEPROCESS process;
-    void* reg_handle;
-    HANDLE thread;
-    bool terminate;
-    KTIMER timer;
-    KDPC timer_dpc;
-
-    void Init();
-};

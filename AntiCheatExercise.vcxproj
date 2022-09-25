@@ -102,9 +102,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="driver.cpp" />
+    <ClCompile Include="memory_scan.cpp" />
+    <ClCompile Include="process_notifications.cpp" />
+    <ClCompile Include="sysinfo.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="driver.h" />
+    <ClInclude Include="globals.h" />
+    <ClInclude Include="logging.h" />
+    <ClInclude Include="memory_scan.h" />
+    <ClInclude Include="nt_internals.h" />
+    <ClInclude Include="process_notifications.h" />
+    <ClInclude Include="raii.h" />
+    <ClInclude Include="sysinfo.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
