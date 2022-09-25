@@ -5,30 +5,9 @@
 
 PSYSTEM_PROCESSES SysInfo::ProcessList()
 {
-    ULONG bufferSize = 0;
-    NTSTATUS status = ZwQuerySystemInformation(SystemProcessInformation, nullptr, 0, &bufferSize);
-    if (status == STATUS_INFO_LENGTH_MISMATCH)
-    {
-        void* buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
-        if (buf)
-        {
-            status = ZwQuerySystemInformation(SystemProcessInformation, buf, bufferSize, &bufferSize);
-            if (NT_SUCCESS(status))
-            {
-                return reinterpret_cast<PSYSTEM_PROCESSES>(buf);
-            }
-
-            ExFreePoolWithTag(buf, POOL_TAG);
-        }
-    }
-
-    return nullptr;
-}
-
-PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
-{
-    ULONG bufferSize = sizeof(SYSTEM_HANDLE_INFORMATION_EX);
     NTSTATUS status = STATUS_INVALID_HANDLE;
+
+    ULONG buf_size = sizeof(SYSTEM_HANDLE_INFORMATION_EX);
     void* buf = nullptr;
 
     do
@@ -39,29 +18,56 @@ PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
             buf = nullptr;
         }
 
-        buf = ExAllocatePoolWithTag(PagedPool, bufferSize, POOL_TAG);
+        buf = ExAllocatePoolWithTag(PagedPool, buf_size, POOL_TAG);
 
-        status = ZwQuerySystemInformation(SystemExtendedHandleInformation, buf, bufferSize, &bufferSize);
+        status = ZwQuerySystemInformation(SystemProcessInformation, buf, buf_size, &buf_size);
 
     } while (status == STATUS_INFO_LENGTH_MISMATCH);
 
-    if (NT_SUCCESS(status))
+    if (!NT_SUCCESS(status) && buf)
     {
-        return reinterpret_cast<PSYSTEM_HANDLE_INFORMATION_EX>(buf);
+        ExFreePoolWithTag(buf, POOL_TAG);
     }
-    else
+
+    return reinterpret_cast<PSYSTEM_PROCESSES>(buf);
+}
+
+PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
+{
+    NTSTATUS status = STATUS_INVALID_HANDLE;
+    
+    ULONG buf_size = sizeof(SYSTEM_HANDLE_INFORMATION_EX);
+    void* buf = nullptr;
+
+    do
     {
         if (buf)
         {
             ExFreePoolWithTag(buf, POOL_TAG);
+            buf = nullptr;
         }
+
+        buf = ExAllocatePoolWithTag(PagedPool, buf_size, POOL_TAG);
+
+        status = ZwQuerySystemInformation(SystemExtendedHandleInformation, buf, buf_size, &buf_size);
+
+    } while (status == STATUS_INFO_LENGTH_MISMATCH);
+
+    if (!NT_SUCCESS(status) && buf)
+    {
+        ExFreePoolWithTag(buf, POOL_TAG);
     }
 
-    return nullptr;
+    return reinterpret_cast<PSYSTEM_HANDLE_INFORMATION_EX>(buf);
 }
 
 PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES process_list, ULONG_PTR pid)
 {
+    if (!process_list)
+    {
+        return nullptr;
+    }
+
     PSYSTEM_PROCESSES p_entry = process_list;
 
     do
@@ -71,7 +77,7 @@ PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES process_list, ULONG_PTR
             return p_entry;
         }
 
-        p_entry = (PSYSTEM_PROCESSES)((char*)p_entry + p_entry->NextEntryDelta);
+        p_entry = reinterpret_cast<PSYSTEM_PROCESSES>(reinterpret_cast<char*>(p_entry) + p_entry->NextEntryDelta);
 
     } while (p_entry->ProcessId);
 

@@ -14,28 +14,27 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
 {
     if (p_create_info)
     {
-        // TODO: Switch to using process name defined in global state?
-        if (wcsstr(p_create_info->CommandLine->Buffer, L"notepad") != nullptr)
+        if (wcsstr(p_create_info->CommandLine->Buffer, g_state.target_process_name) != nullptr)
         {
-            if (g_state.pid != 0)
+            if (g_state.target_pid != 0)
             {
                 p_create_info->CreationStatus = STATUS_ACCESS_DENIED;
                 return;
             }
 
-            g_state.pid = process_id;
-            g_state.process = p_process;
+            g_state.target_pid = process_id;
+            g_state.target_process = p_process;
 
-            KdPrint(("notepad.exe has started."));
+            KdPrint(("%ws has started.", g_state.target_process_name));
         }
     }
     else
     {
-        if (process_id == g_state.pid)
+        if (process_id == g_state.target_pid)
         {
-            KdPrint(("notepad.exe has stopped"));
-            g_state.pid = 0;
-            g_state.process = nullptr;
+            KdPrint(("%ws has stopped", g_state.target_process_name));
+            g_state.target_pid = 0;
+            g_state.target_process = nullptr;
         }
     }
 }
@@ -93,7 +92,7 @@ void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
     }
 }
 
-bool exclusion_check(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wchar_t* excluded_process_name)
+bool Notifications::IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wchar_t* excluded_process_name)
 {
     // TODO: Perform some kind of integrity check here.
 
@@ -126,7 +125,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
     HANDLE pid = PsGetProcessId(p_process);
 
     // Ignore cases where the process being accessed is not our target process.
-    if (pid != g_state.pid)
+    if (pid != g_state.target_pid)
     {
         return;
     }
@@ -134,7 +133,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
     HANDLE requesting_pid = PsGetCurrentProcessId();
 
     // Ignore cases where the target process tries to interact with a handle to itself.
-    if (requesting_pid == g_state.pid)
+    if (requesting_pid == g_state.target_pid)
     {
         return;
     }
@@ -151,13 +150,13 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
         do
         {
-            excluded = exclusion_check(p_entry, requesting_pid, L"csrss.exe");
+            excluded = IsExcluded(p_entry, requesting_pid, L"csrss.exe");
             if (excluded)
             {
                 break;
             }
 
-            excluded = exclusion_check(p_entry, requesting_pid, L"explorer.exe");
+            excluded = IsExcluded(p_entry, requesting_pid, L"explorer.exe");
             if (excluded)
             {
                 break;

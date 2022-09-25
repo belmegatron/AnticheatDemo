@@ -13,4 +13,5 @@ namespace Notifications
 
     void RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info);
     void OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info);
+    bool IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wchar_t* excluded_process_name);
 }

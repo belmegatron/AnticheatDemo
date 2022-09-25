@@ -5,20 +5,32 @@
 
 struct GlobalState
 {
-    HANDLE pid;
-    PEPROCESS process;
+    // This is the process we are going to protect.
+    PWCHAR target_process_name;
+
+    // PID of target process.
+    HANDLE target_pid;
+
+    // Pointer to target process.
+    PEPROCESS target_process;
+
+    // Registration handle for ObRegisterCallbacks.
     void* reg_handle;
-    HANDLE thread;
-    bool terminate;
+
+    // Handle to memory scanner thread.
+    HANDLE scanner_thread;
+
+    // Timer used to schedule memory scans.
     KTIMER timer;
-    KDPC timer_dpc;
 
     void Init()
     {
-        pid = 0;
-        process = nullptr;
+        target_process_name = L"notepad.exe";
+        target_pid = 0;
+        target_process = nullptr;
         reg_handle = nullptr;
-        thread = nullptr;
+        scanner_thread = nullptr;
+        timer = {};
     };
 
 };

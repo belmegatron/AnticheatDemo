@@ -6,7 +6,7 @@
 GlobalState g_state;
 
 constexpr UNICODE_STRING device_name = RTL_CONSTANT_STRING(L"\\Device\\AntiCheatDemo");
-constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");;
+constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object);
 NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp);

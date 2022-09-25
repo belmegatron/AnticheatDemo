@@ -18,9 +18,9 @@ void MemoryScanRoutine(PVOID context)
         {
             KdPrint(("Executing memory scan routine."));
 
-            if (g_state.pid == 0)
+            if (g_state.target_pid == 0)
             {
-                KdPrint(("Aborting memory scan as notepad.exe not running."));
+                KdPrint(("Aborting memory scan as %ws not running.", g_state.target_process_name));
                 continue;
             }
 
@@ -40,13 +40,13 @@ void MemoryScanRoutine(PVOID context)
                 {
                     SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = handle_information->Handles[i];
 
-                    if (g_state.process == entry.Object)
+                    if (g_state.target_process == entry.Object)
                     {
                         PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(process_list, entry.UniqueProcessId);
                         if (p_process)
                         {
                             // TODO: Perform lookup on access values maybe?
-                            KdPrint(("Process: %wZ, Access: %x", p_process->ProcessName, entry.GrantedAccess));
+                            KdPrint(("Process: %ws, Access: %x", p_process->ProcessName, entry.GrantedAccess));
                         }
                     }
                 }
@@ -66,35 +66,35 @@ void Scanner::Setup()
     KeInitializeTimerEx(&g_state.timer, SynchronizationTimer);
     LARGE_INTEGER interval{ 10000 , 0 };
     KeSetTimerEx(&g_state.timer, interval, 30000, nullptr);
-    PsCreateSystemThread(&g_state.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    PsCreateSystemThread(&g_state.scanner_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
 }
 
 void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES process_list)
 {
     KdPrint(("Starting memory region scan"));
 
-    if (g_state.pid == 0)
+    if (g_state.target_pid == 0)
     {
         return;
     }
 
-    PSYSTEM_PROCESSES process = SysInfo::FindProcess(process_list, reinterpret_cast<ULONG_PTR>(g_state.pid));
+    PSYSTEM_PROCESSES process = SysInfo::FindProcess(process_list, reinterpret_cast<ULONG_PTR>(g_state.target_pid));
     if (!process)
     {
-        KdPrint(("Unable to find target process when performing memory region scan: %x", g_state.pid));
+        KdPrint(("Unable to find target process when performing memory region scan: %x", g_state.target_pid));
         return;
     }
 
-    CLIENT_ID client_id = { g_state.pid, 0 };
+    CLIENT_ID client_id = { g_state.target_pid, 0 };
 
-    HANDLE process_handle;
-    OBJECT_ATTRIBUTES attributes;
+    HANDLE process_handle = INVALID_HANDLE_VALUE;
+    OBJECT_ATTRIBUTES attributes = {};
     InitializeObjectAttributes(&attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
 
     NTSTATUS status = ZwOpenProcess(&process_handle, GENERIC_ALL, &attributes, &client_id);
     if (!NT_SUCCESS(status))
     {
-        KdPrint(("Unable to open handle to notepad.exe: %x", status));
+        KdPrint(("Unable to open handle to %ws: %x", g_state.target_process_name, status));
         return;
     }
 
@@ -103,11 +103,9 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES process_list)
     MEMORY_BASIC_INFORMATION info = {};
     ULONG_PTR base_address = 0;
 
-    SIZE_T ReturnLength = 0;
-
     do
     {
-        status = ZwQueryVirtualMemory(process_handle, (PVOID)base_address, MemoryBasicInformation, &info, sizeof(info), &ReturnLength);
+        status = ZwQueryVirtualMemory(process_handle, (PVOID)base_address, MemoryBasicInformation, &info, sizeof(info), nullptr);
         if (NT_SUCCESS(status))
         {
             PrintMemoryAllocation(&info);
@@ -117,7 +115,6 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES process_list)
         RtlSecureZeroMemory(&info, sizeof(info));
 
     } while (NT_SUCCESS(status));
-
 }
 
 void Scanner::PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)

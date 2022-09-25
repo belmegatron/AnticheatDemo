@@ -1,6 +1,8 @@
 #pragma once
 #include <ntddk.h>
 
+#define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
+
 typedef struct _MEMORY_BASIC_INFORMATION {
     PVOID  BaseAddress;
     PVOID  AllocationBase;
