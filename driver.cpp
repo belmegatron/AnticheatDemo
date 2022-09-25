@@ -5,6 +5,9 @@
 
 GlobalState g_state;
 
+constexpr UNICODE_STRING device_name = RTL_CONSTANT_STRING(L"\\Device\\AntiCheatDemo");
+constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");;
+
 void DriverUnload(PDRIVER_OBJECT p_driver_object);
 NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp);
 void DriverEntryCleanup(bool symlink_created, PDEVICE_OBJECT p_device_object);
@@ -17,46 +20,29 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
 
     PDEVICE_OBJECT p_device_object = nullptr;
     bool symlink_created = false;
+
+    // Initialize our global state.
     g_state.Init();
 
-    UNICODE_STRING device_name = RTL_CONSTANT_STRING(L"\\Device\\AntiCheatDemo");
-
-    NTSTATUS status = IoCreateDevice(p_driver_object, 0, &device_name, FILE_DEVICE_UNKNOWN, 0, true, &p_device_object);
+    NTSTATUS status = IoCreateDevice(p_driver_object, 0, const_cast<PUNICODE_STRING>(&device_name), FILE_DEVICE_UNKNOWN, 0, true, &p_device_object);
     if (NT_SUCCESS(status))
     {
-        UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
-        status = IoCreateSymbolicLink(&symlink, &device_name);
+        status = IoCreateSymbolicLink(const_cast<PUNICODE_STRING>(&symlink), const_cast<PUNICODE_STRING>(&device_name));
         if (NT_SUCCESS(status))
         {
             symlink_created = true;
 
-            status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, false);
-
+            status = Notifications::Setup();
             if (NT_SUCCESS(status))
             {
-                status = Notifications::Setup();
-                if (NT_SUCCESS(status))
-                {
-                    p_driver_object->DriverUnload = DriverUnload;
-                    p_driver_object->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
-                    p_driver_object->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
+                p_driver_object->DriverUnload = DriverUnload;
+                p_driver_object->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
+                p_driver_object->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
 
-                    Scanner::Setup();
-                }
-            }
-            else
-            {
-                KdPrint(("Failed to call PsSetCreateProcessNotifyRoutineEx"));
+                // TODO: This should report errors.
+                Scanner::Setup();
             }
         }
-        else
-        {
-            KdPrint(("Failed to create symbolic link"));
-        }
-    }
-    else
-    {
-        KdPrint(("Failed to create device"));
     }
 
     if (!NT_SUCCESS(status))
@@ -86,9 +72,7 @@ void DriverUnload(PDRIVER_OBJECT p_driver_object)
 
     PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, true);
 
-    UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
-
-    IoDeleteSymbolicLink(&symlink);
+    IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
     IoDeleteDevice(p_driver_object->DeviceObject);
 
     KdPrint(("Unloaded AntiCheat Driver"));
@@ -98,8 +82,7 @@ void DriverEntryCleanup(bool symlink_created, PDEVICE_OBJECT p_device_object)
 {
     if (symlink_created)
     {
-        UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
-        IoDeleteSymbolicLink(&symlink);
+        IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
     }
 
     if (p_device_object)

@@ -2,10 +2,7 @@
 #include "globals.h"
 #include "sysinfo.h"
 
-#pragma warning (disable : 4244)
-
 extern GlobalState g_state;
-
 
 OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION p_info)
 {
@@ -45,6 +42,14 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
 
 NTSTATUS Notifications::Setup()
 {
+    NTSTATUS status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, false);
+
+    // TODO: Need to keep a record of this in global state.
+    if (!NT_SUCCESS(status))
+    {
+        return status;
+    }
+
     OB_OPERATION_REGISTRATION operations[] = 
     {
         {
@@ -99,7 +104,7 @@ bool exclusion_check(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wch
         if (wcsstr(p_entry->ProcessName.Buffer, excluded_process_name))
         {
             // Check that the PID from our process list matches the PID of the process requesting access.
-            if (ULongToHandle(p_entry->ProcessId) == requesting_pid)
+            if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == requesting_pid)
             {
                 excluded = true;
             }

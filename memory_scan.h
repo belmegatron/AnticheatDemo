@@ -9,5 +9,5 @@ namespace Scanner
 
     void Setup();
     void ScanMemoryRegions(PSYSTEM_PROCESSES process_list);
-    void PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info);
+    void PrintMemoryAllocation(MEMORY_BASIC_INFORMATION* p_info);
 }

@@ -77,26 +77,3 @@ PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES process_list, ULONG_PTR
 
     return nullptr;
 }
-
-PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES process_list, const wchar_t* process_name)
-{
-    PSYSTEM_PROCESSES p_entry = process_list;
-
-    do
-    {
-        if (p_entry->ProcessName.Length)
-        {
-            // TODO: Perform some kind of integrity check here.
-
-            if (wcsstr(p_entry->ProcessName.Buffer, process_name))
-            {
-                return p_entry;
-            }
-        }
-
-        p_entry = (PSYSTEM_PROCESSES)((char*)p_entry + p_entry->NextEntryDelta);
-
-    } while (p_entry->NextEntryDelta);
-
-    return nullptr;
-}
