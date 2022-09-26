@@ -7,6 +7,8 @@ namespace Scanner
     constexpr int FREE = 0x0000000;
     constexpr int NONE = 0x00;
 
+    constexpr unsigned int scanner_interval_ms = 30000;
+
     void Setup();
     void ScanMemoryRegions(PSYSTEM_PROCESSES process_list);
     void PrintMemoryAllocation(MEMORY_BASIC_INFORMATION* p_info);

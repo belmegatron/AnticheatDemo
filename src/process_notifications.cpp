@@ -94,6 +94,11 @@ void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
 
 bool Notifications::IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wchar_t* excluded_process_name)
 {
+    if (!p_entry || !excluded_process_name)
+    {
+        return;
+    }
+
     // TODO: Perform some kind of integrity check here.
 
     bool excluded = false;
@@ -115,14 +120,19 @@ bool Notifications::IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid,
 
 void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 {
+    if (!p_info)
+    {
+        return;
+    }
+
     // Ignore kernel access.
     if (p_info->KernelHandle)
     {
         return;
     }
 
-    PEPROCESS p_process = reinterpret_cast<PEPROCESS>(p_info->Object);
-    HANDLE pid = PsGetProcessId(p_process);
+    const PEPROCESS p_process = reinterpret_cast<PEPROCESS>(p_info->Object);
+    const HANDLE pid = PsGetProcessId(p_process);
 
     // Ignore cases where the process being accessed is not our target process.
     if (pid != g_state.target_pid)
@@ -130,7 +140,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
         return;
     }
 
-    HANDLE requesting_pid = PsGetCurrentProcessId();
+    const HANDLE requesting_pid = PsGetCurrentProcessId();
 
     // Ignore cases where the target process tries to interact with a handle to itself.
     if (requesting_pid == g_state.target_pid)
@@ -142,11 +152,11 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
     // TODO: This is quite expensive but realistically shouldn't be happening too often. Perhaps cache the result
     // and only call again if it's too old?
-    PSYSTEM_PROCESSES process_list = SysInfo::ProcessList();
+    const PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
 
-    if (process_list)
+    if (p_process_list)
     {
-        PSYSTEM_PROCESSES p_entry = process_list;
+        PSYSTEM_PROCESSES p_entry = p_process_list;
 
         do
         {
@@ -166,7 +176,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
         } while (p_entry->NextEntryDelta);
 
-        ExFreePoolWithTag(process_list, POOL_TAG);
+        ExFreePoolWithTag(p_process_list, POOL_TAG);
 
         // TODO: Would be nice to specify who we denied access to.
         if (!excluded)

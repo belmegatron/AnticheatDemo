@@ -63,7 +63,6 @@
     <ClInclude Include="include\memory_scan.h" />
     <ClInclude Include="include\nt_internals.h" />
     <ClInclude Include="include\process_notifications.h" />
-    <ClInclude Include="include\raii.h" />
     <ClInclude Include="include\sysinfo.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
