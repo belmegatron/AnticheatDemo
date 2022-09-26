@@ -64,8 +64,10 @@ void MemoryScanRoutine(PVOID p_context)
 void Scanner::Setup()
 {
     KeInitializeTimerEx(&g_state.timer, SynchronizationTimer);
+
     const LARGE_INTEGER interval{ 0 , 0 };
-    KeSetTimerEx(&g_state.timer, interval, 30000, nullptr);
+    KeSetTimerEx(&g_state.timer, interval, scanner_interval_ms, nullptr);
+
     PsCreateSystemThread(&g_state.scanner_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
 }
 
@@ -92,9 +94,10 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
 
     CLIENT_ID client_id = { g_state.target_pid, 0 };
 
-    HANDLE h_process = INVALID_HANDLE_VALUE;
     OBJECT_ATTRIBUTES attributes = {};
     InitializeObjectAttributes(&attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
+
+    HANDLE h_process = INVALID_HANDLE_VALUE;
 
     NTSTATUS status = ZwOpenProcess(&h_process, GENERIC_ALL, &attributes, &client_id);
     if (!NT_SUCCESS(status))
@@ -120,6 +123,8 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
         RtlSecureZeroMemory(&info, sizeof(info));
 
     } while (NT_SUCCESS(status));
+
+    ZwClose(h_process);
 }
 
 void Scanner::PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)

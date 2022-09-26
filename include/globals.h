@@ -8,6 +8,8 @@ struct GlobalState
     // This is the process we are going to protect.
     PWCHAR target_process_name;
 
+    // TODO: Need a mutex here!
+
     // PID of target process.
     HANDLE target_pid;
 

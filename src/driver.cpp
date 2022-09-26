@@ -9,7 +9,7 @@ constexpr UNICODE_STRING device_name = RTL_CONSTANT_STRING(L"\\Device\\AntiCheat
 constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object);
-NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp);
+NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP p_irp);
 void DriverEntryCleanup(bool symlink_created, PDEVICE_OBJECT p_device_object);
 
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING reg_path)
@@ -66,6 +66,8 @@ NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp)
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object)
 {
+    // TODO: Await scanning thread finishing and close handle to thread.
+
     KeCancelTimer(&g_state.timer);
 
     ObUnRegisterCallbacks(g_state.reg_handle);

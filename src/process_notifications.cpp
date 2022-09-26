@@ -30,7 +30,7 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
     }
     else
     {
-        if (process_id == g_state.target_pid)
+        if (g_state.target_pid == process_id)
         {
             KdPrint(("%ws has stopped", g_state.target_process_name));
             g_state.target_pid = 0;

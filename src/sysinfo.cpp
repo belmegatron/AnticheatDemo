@@ -61,14 +61,14 @@ PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
     return reinterpret_cast<PSYSTEM_HANDLE_INFORMATION_EX>(buf);
 }
 
-PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES process_list, ULONG_PTR pid)
+PSYSTEM_PROCESSES SysInfo::FindProcess(PSYSTEM_PROCESSES p_process_list, ULONG_PTR pid)
 {
-    if (!process_list)
+    if (!pp_process_list)
     {
         return nullptr;
     }
 
-    PSYSTEM_PROCESSES p_entry = process_list;
+    PSYSTEM_PROCESSES p_entry = pp_process_list;
 
     do
     {
