@@ -161,13 +161,18 @@ MemoryScanner::Scanner::~Scanner()
 
 void MemoryScanner::Scanner::Scan()
 {
-    void* waitables[2] = { &m_timer, &m_terminate_scan };
+    void* waitables[2] = { &m_terminate_scan, &m_timer};
 
     while (true)
     {
         const NTSTATUS status = KeWaitForMultipleObjects(2, waitables, WaitAny, Executive, KernelMode, true, nullptr, nullptr);
 
-        if (NT_SUCCESS(status))
+        if (status == STATUS_WAIT_0)
+        {
+            KdPrint(("Terminating scanning thread."));
+            return;
+        }
+        else if (status == STATUS_WAIT_1)
         {
             KdPrint(("Executing memory scan routine."));
 
