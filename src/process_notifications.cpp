@@ -41,11 +41,11 @@ void ProcessNotifications::Notifier::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFO
 
 bool ProcessNotifications::Notifier::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
 {
-    bool excluded = false;
+    bool matches = false;
 
     if (!p_entry || !name)
     {
-        return excluded;
+        return matches;
     }
 
     if (p_entry->ProcessName.Length)
@@ -54,15 +54,18 @@ bool ProcessNotifications::Notifier::ProcessEntryMatchesNameAndPID(const PSYSTEM
         {
             if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == pid)
             {
-                excluded = true;
+                matches = true;
             }
         }
     }
 
-    return excluded;
+    return matches;
 }
 
-ProcessNotifications::Notifier::Notifier(TargetProcess* p_target_process) : mp_target_process(p_target_process)
+ProcessNotifications::Notifier::Notifier(TargetProcess* p_target_process) : 
+    mp_target_process(p_target_process), 
+    m_notification_set(false), 
+    mp_callback_reg_handle(nullptr)
 {
     NTSTATUS status = PsSetCreateProcessNotifyRoutineEx(::OnProcessNotify, false);
 
@@ -135,7 +138,7 @@ void ProcessNotifications::Notifier::OnPreOpenProcess(POB_PRE_OPERATION_INFORMAT
     const HANDLE pid = PsGetProcessId(p_process);
 
     // Ignore cases where the process being accessed is not our target process.
-    if (pid != mp_target_process->pid)
+    if (pid != mp_target_process->get_pid())
     {
         return;
     }
@@ -143,7 +146,7 @@ void ProcessNotifications::Notifier::OnPreOpenProcess(POB_PRE_OPERATION_INFORMAT
     const HANDLE requesting_pid = PsGetCurrentProcessId();
 
     // Ignore cases where the process requesting access to our target process, is the target process.
-    if (requesting_pid == mp_target_process->pid)
+    if (requesting_pid == mp_target_process->get_pid())
     {
         return;
     }
@@ -187,27 +190,27 @@ void ProcessNotifications::Notifier::OnProcessNotify(PEPROCESS p_process, HANDLE
 {
     if (p_create_info)
     {
-        if (wcsstr(p_create_info->CommandLine->Buffer, mp_target_process->name) != nullptr)
+        if (wcsstr(p_create_info->CommandLine->Buffer, mp_target_process->get_name()) != nullptr)
         {
-            if (mp_target_process->pid != 0)
+            if (mp_target_process->get_pid() != 0)
             {
                 p_create_info->CreationStatus = STATUS_ACCESS_DENIED;
                 return;
             }
 
-            mp_target_process->pid = process_id;
-            mp_target_process->p_process = p_process;
+            mp_target_process->set_pid(process_id);
+            mp_target_process->set_process(p_process);
 
-            KdPrint(("%ws has started.", mp_target_process->name));
+            KdPrint(("%ws has started.", mp_target_process->get_name()));
         }
     }
     else
     {
-        if (mp_target_process->pid == process_id)
+        if (mp_target_process->get_pid() == process_id)
         {
-            KdPrint(("%ws has stopped", mp_target_process->name));
-            mp_target_process->pid = 0;
-            mp_target_process->p_process = nullptr;
+            KdPrint(("%ws has stopped", mp_target_process->get_name()));
+            mp_target_process->set_pid(0);
+            mp_target_process->set_process(nullptr);
         }
     }
 }

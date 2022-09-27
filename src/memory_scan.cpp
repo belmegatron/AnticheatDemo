@@ -21,18 +21,18 @@ void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process
         return;
     }
 
-    if (mp_target_process->pid == 0)
+    if (mp_target_process->get_pid() == 0)
     {
         return;
     }
 
-    const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->pid));
+    const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->get_pid()));
     if (!p_process)
     {
         return;
     }
 
-    CLIENT_ID client_id = { mp_target_process->pid, 0 };
+    CLIENT_ID client_id = { mp_target_process->get_pid(), 0 };
 
     OBJECT_ATTRIBUTES attributes = {};
     InitializeObjectAttributes(&attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
@@ -116,13 +116,13 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
         return;
     }
 
-    KdPrint(("Processes with open handles to %ws:", mp_target_process->name));
+    KdPrint(("Processes with open handles to %ws:", mp_target_process->get_name()));
 
     for (unsigned int i = 0; i < p_handle_list->NumberOfHandles; ++i)
     {
         const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
 
-        if (entry.Object == mp_target_process->p_process)
+        if (entry.Object == mp_target_process->get_process())
         {
             const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
             if (p_process)
@@ -158,9 +158,9 @@ void MemoryScanner::Scanner::Scan()
         {
             KdPrint(("Executing memory scan routine."));
 
-            if (mp_target_process->pid == 0)
+            if (mp_target_process->get_pid() == 0)
             {
-                KdPrint(("Aborting memory scan as %ws is not running.", mp_target_process->name));
+                KdPrint(("Aborting memory scan as %ws is not running.", mp_target_process->get_name()));
                 continue;
             }
 
