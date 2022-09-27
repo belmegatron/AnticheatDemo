@@ -10,16 +10,18 @@ constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object);
 NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP p_irp);
-void DriverEntryCleanup(bool symlink_created, PDEVICE_OBJECT p_device_object);
+void DriverEntryCleanup(PDEVICE_OBJECT p_device_object);
 
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING reg_path)
 {
     UNREFERENCED_PARAMETER(reg_path);
 
-    KdPrint(("DriverEntry called"));
+    p_driver_object->DriverUnload = DriverUnload;
+    p_driver_object->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
+    p_driver_object->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
 
     PDEVICE_OBJECT p_device_object = nullptr;
-    bool symlink_created = false;
+    bool setup_success = false;
 
     // Initialize our global state.
     g_state.Init();
@@ -30,24 +32,23 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
         status = IoCreateSymbolicLink(const_cast<PUNICODE_STRING>(&symlink), const_cast<PUNICODE_STRING>(&device_name));
         if (NT_SUCCESS(status))
         {
-            symlink_created = true;
+            g_state.symlink_created = true;
 
-            status = Notifications::Setup();
-            if (NT_SUCCESS(status))
+            setup_success = Notifications::Setup();
+            if (setup_success)
             {
-                p_driver_object->DriverUnload = DriverUnload;
-                p_driver_object->MajorFunction[IRP_MJ_CREATE] = DriverCreateClose;
-                p_driver_object->MajorFunction[IRP_MJ_CLOSE] = DriverCreateClose;
-
-                // TODO: This should report errors.
-                Scanner::Setup();
+                setup_success = Scanner::Setup();
+                if (setup_success)
+                {
+                    KdPrint(("Loaded AntiCheat Driver."));
+                }
             }
         }
     }
 
-    if (!NT_SUCCESS(status))
+    if (!NT_SUCCESS(status) || !setup_success)
     {
-        DriverEntryCleanup(symlink_created, p_device_object);
+        DriverEntryCleanup(p_device_object);
     }
 
     return status;
@@ -66,23 +67,29 @@ NTSTATUS DriverCreateClose(PDEVICE_OBJECT p_device_object, PIRP irp)
 
 void DriverUnload(PDRIVER_OBJECT p_driver_object)
 {
-    // TODO: Await scanning thread finishing and close handle to thread.
-
-    KeCancelTimer(&g_state.timer);
-
-    ObUnRegisterCallbacks(g_state.callback_reg_handle);
-
-    PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, true);
-
-    IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
-    IoDeleteDevice(p_driver_object->DeviceObject);
+    DriverEntryCleanup(p_driver_object->DeviceObject);
 
     KdPrint(("Unloaded AntiCheat Driver"));
 }
 
-void DriverEntryCleanup(bool symlink_created, PDEVICE_OBJECT p_device_object)
+void DriverEntryCleanup(PDEVICE_OBJECT p_device_object)
 {
-    if (symlink_created)
+    if (g_state.scanner.timer_set)
+    {
+        KeCancelTimer(&g_state.scanner.timer);
+    }
+
+    if (g_state.callback_reg_handle)
+    {
+        ObUnRegisterCallbacks(g_state.callback_reg_handle);
+    }
+
+    if (g_state.process_notification_set)
+    {
+        PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, true);
+    }
+
+    if (g_state.symlink_created)
     {
         IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
     }

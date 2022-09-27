@@ -47,6 +47,8 @@ bool Notifications::Setup()
 
     if (NT_SUCCESS(status))
     {
+        g_state.process_notification_set = true;
+
         OB_OPERATION_REGISTRATION operations[] =
         {
             {
