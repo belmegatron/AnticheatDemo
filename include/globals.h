@@ -1,8 +1,7 @@
 #pragma once
 #include <ntddk.h>
 #include "memory_scan.h"
-
-#define POOL_TAG 'ca'
+#include "common.h"
 
 
 struct GlobalState
@@ -26,7 +25,7 @@ struct GlobalState
     void* callback_reg_handle;
 
     // State associated with our memory scanning routine.
-    MemoryScanner::State scanner;
+    MemoryScanner::Scanner* p_scanner;
 
     void Init()
     {
@@ -36,7 +35,7 @@ struct GlobalState
         target_pid = 0;
         target_process = nullptr;
         callback_reg_handle = nullptr;
-        scanner.Init();
-    };
 
+        p_scanner = new(MemoryScanner::Scanner);
+    };
 };

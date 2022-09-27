@@ -62,7 +62,7 @@ bool ProcessNotifications::Setup()
         {
             OB_FLT_REGISTRATION_VERSION,
             1,
-            RTL_CONSTANT_STRING(L"1337.1337"),
+            RTL_CONSTANT_STRING(L"9876.5432"),
             nullptr,
             operations
         };

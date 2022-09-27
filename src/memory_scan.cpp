@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "sysinfo.h"
 
+
 extern GlobalState g_state;
 
 void MemoryScanRoutine(PVOID p_context)
@@ -9,61 +10,10 @@ void MemoryScanRoutine(PVOID p_context)
     UNREFERENCED_PARAMETER(p_context);
 
     // TODO: DriverUnload needs to signal this thread to terminate.
-
-    while (true)
-    {
-        const NTSTATUS status = KeWaitForSingleObject(&g_state.scanner.timer, Executive, KernelMode, true, nullptr);
-
-        if (NT_SUCCESS(status))
-        {
-            KdPrint(("Executing memory scan routine."));
-
-            if (g_state.target_pid == 0)
-            {
-                KdPrint(("Aborting memory scan as %ws is not running.", g_state.target_process_name));
-                continue;
-            }
-
-            PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
-
-            if (p_process_list)
-            {
-                PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
-
-                if (p_handle_list)
-                {
-                    MemoryScanner::PrintHandlesOpenToTargetProcess(p_process_list, p_handle_list);
-
-                    ExFreePoolWithTag(p_handle_list, POOL_TAG);
-                }
-
-                MemoryScanner::ScanMemoryRegions(p_process_list);
-
-                ExFreePoolWithTag(p_process_list, POOL_TAG);
-            }
-        }
-    }
+    g_state.p_scanner->Scan();
 }
 
-bool MemoryScanner::Setup()
-{
-    KeInitializeTimerEx(&g_state.scanner.timer, SynchronizationTimer);
-
-    const LARGE_INTEGER interval{ 0 , 0 };
-    KeSetTimerEx(&g_state.scanner.timer, interval, scanner_interval_ms, nullptr);
-
-    g_state.scanner.timer_set = true;
-
-    NTSTATUS status = PsCreateSystemThread(&g_state.scanner.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
-    if (NT_SUCCESS(status))
-    {
-        return true;
-    }
-
-    return false;
-}
-
-void MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
+void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
 {
     if (!p_process_list)
     {
@@ -113,7 +63,7 @@ void MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
     ZwClose(h_process);
 }
 
-void MemoryScanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
+void MemoryScanner::Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -158,7 +108,7 @@ void MemoryScanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION 
     }
 }
 
-void MemoryScanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list)
+void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list)
 {
     if (!p_process_list || !p_handle_list)
     {
@@ -177,6 +127,61 @@ void MemoryScanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_pr
             if (p_process)
             {
                 KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
+            }
+        }
+    }
+}
+
+MemoryScanner::Scanner::Scanner()
+{
+    KdPrint(("Scanner constructor called"));
+
+    KeInitializeTimerEx(&m_timer, SynchronizationTimer);
+
+    const LARGE_INTEGER interval{ 0 , 0 };
+    KeSetTimerEx(&m_timer, interval, scanner_interval_ms, nullptr);
+
+    PsCreateSystemThread(&m_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+}
+
+MemoryScanner::Scanner::~Scanner()
+{
+    KdPrint(("Scanner destructor called"));
+    KeCancelTimer(&m_timer);
+}
+
+void MemoryScanner::Scanner::Scan()
+{
+    while (true)
+    {
+        const NTSTATUS status = KeWaitForSingleObject(&m_timer, Executive, KernelMode, true, nullptr);
+
+        if (NT_SUCCESS(status))
+        {
+            KdPrint(("Executing memory scan routine."));
+
+            if (g_state.target_pid == 0)
+            {
+                KdPrint(("Aborting memory scan as %ws is not running.", g_state.target_process_name));
+                continue;
+            }
+
+            PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
+
+            if (p_process_list)
+            {
+                PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
+
+                if (p_handle_list)
+                {
+                    PrintHandlesOpenToTargetProcess(p_process_list, p_handle_list);
+
+                    ExFreePoolWithTag(p_handle_list, POOL_TAG);
+                }
+
+                ScanMemoryRegions(p_process_list);
+
+                ExFreePoolWithTag(p_process_list, POOL_TAG);
             }
         }
     }

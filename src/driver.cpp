@@ -37,11 +37,7 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
             setup_success = ProcessNotifications::Setup();
             if (setup_success)
             {
-                setup_success = MemoryScanner::Setup();
-                if (setup_success)
-                {
-                    KdPrint(("Loaded AntiCheat Driver."));
-                }
+                KdPrint(("Loaded AntiCheat Driver."));
             }
         }
     }
@@ -74,11 +70,6 @@ void DriverUnload(PDRIVER_OBJECT p_driver_object)
 
 void DriverEntryCleanup(PDEVICE_OBJECT p_device_object)
 {
-    if (g_state.scanner.timer_set)
-    {
-        KeCancelTimer(&g_state.scanner.timer);
-    }
-
     if (g_state.callback_reg_handle)
     {
         ObUnRegisterCallbacks(g_state.callback_reg_handle);
