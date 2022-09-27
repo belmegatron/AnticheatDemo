@@ -34,10 +34,10 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
         {
             g_state.symlink_created = true;
 
-            setup_success = Notifications::Setup();
+            setup_success = ProcessNotifications::Setup();
             if (setup_success)
             {
-                setup_success = Scanner::Setup();
+                setup_success = MemoryScanner::Setup();
                 if (setup_success)
                 {
                     KdPrint(("Loaded AntiCheat Driver."));

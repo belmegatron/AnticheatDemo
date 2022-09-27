@@ -6,7 +6,7 @@ extern GlobalState g_state;
 
 OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION p_info)
 {
-    Notifications::OnPreOpenProcess(p_info);
+    ProcessNotifications::OnPreOpenProcess(p_info);
     return OB_PREOP_SUCCESS;
 }
 
@@ -39,7 +39,7 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
     }
 }
 
-bool Notifications::Setup()
+bool ProcessNotifications::Setup()
 {
     bool success = false;
 
@@ -78,7 +78,7 @@ bool Notifications::Setup()
     return success;
 }
 
-void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
+void ProcessNotifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -100,23 +100,20 @@ void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
     }
 }
 
-bool Notifications::IsExcluded(const PSYSTEM_PROCESSES p_entry, const HANDLE requesting_pid, const wchar_t* excluded_process_name)
+bool ProcessNotifications::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
 {
     bool excluded = false;
 
-    if (!p_entry || !excluded_process_name)
+    if (!p_entry || !name)
     {
         return excluded;
     }
 
-    // TODO: Perform some kind of integrity check here.
-
     if (p_entry->ProcessName.Length)
     {
-        if (wcsstr(p_entry->ProcessName.Buffer, excluded_process_name))
+        if (wcsstr(p_entry->ProcessName.Buffer, name))
         {
-            // Check that the PID from our process list matches the PID of the process requesting access.
-            if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == requesting_pid)
+            if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == pid)
             {
                 excluded = true;
             }
@@ -126,7 +123,7 @@ bool Notifications::IsExcluded(const PSYSTEM_PROCESSES p_entry, const HANDLE req
     return excluded;
 }
 
-void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
+void ProcessNotifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -156,7 +153,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
         return;
     }
 
-    bool excluded = false;
+    bool allow_access = false;
 
     // TODO: This is quite expensive but realistically shouldn't be happening too often. Perhaps cache the result
     // and only call again if it's too old?
@@ -168,14 +165,14 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
         do
         {
-            excluded = IsExcluded(p_entry, requesting_pid, L"csrss.exe");
-            if (excluded)
+            allow_access = ProcessEntryMatchesNameAndPID(p_entry, L"csrss.exe", requesting_pid);
+            if (allow_access)
             {
                 break;
             }
 
-            excluded = IsExcluded(p_entry, requesting_pid, L"explorer.exe");
-            if (excluded)
+            allow_access = ProcessEntryMatchesNameAndPID(p_entry, L"explorer.exe", requesting_pid);
+            if (allow_access)
             {
                 break;
             }
@@ -186,7 +183,7 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
         ExFreePoolWithTag(p_process_list, POOL_TAG);
 
-        if (!excluded)
+        if (!allow_access)
         {
             RemoveRWMemoryAccess(p_info);
         }

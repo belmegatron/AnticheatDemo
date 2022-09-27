@@ -1,30 +1,16 @@
 #pragma once
 #include <ntddk.h>
+#include "memory_scan.h"
 
 #define POOL_TAG 'ca'
 
-struct ScannerState
-{
-    // Handle to memory scanner thread.
-    HANDLE thread;
-
-    // Timer used to schedule memory scans.
-    KTIMER timer;
-
-    bool timer_set;
-
-    void Init()
-    {
-        thread = nullptr;
-        timer = {};
-        timer_set = false;
-    }
-};
 
 struct GlobalState
 {
+    // True if created symlink for driver.
     bool symlink_created;
 
+    // True if we called PsSetCreateProcessNotifyRoutineEx successfully when setting our callback.
     bool process_notification_set;
 
     // This is the process we are going to protect.
@@ -39,7 +25,8 @@ struct GlobalState
     // Registration handle for ObRegisterCallbacks.
     void* callback_reg_handle;
 
-    ScannerState scanner;
+    // State associated with our memory scanning routine.
+    MemoryScanner::State scanner;
 
     void Init()
     {

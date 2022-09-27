@@ -24,44 +24,28 @@ void MemoryScanRoutine(PVOID p_context)
                 continue;
             }
 
-            const PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
+            PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
 
-            if (!p_process_list)
+            if (p_process_list)
             {
-                continue;
-            }
+                PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
 
-            const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
-
-            if (p_handle_list)
-            {
-                KdPrint(("Processes with open handles to %ws:", g_state.target_process_name));
-
-                for (unsigned int i = 0; i < p_handle_list->NumberOfHandles; ++i)
+                if (p_handle_list)
                 {
-                    const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
+                    MemoryScanner::PrintHandlesOpenToTargetProcess(p_process_list, p_handle_list);
 
-                    if (entry.Object == g_state.target_process)
-                    {
-                        const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
-                        if (p_process)
-                        {
-                            KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
-                        }
-                    }
+                    ExFreePoolWithTag(p_handle_list, POOL_TAG);
                 }
 
-                ExFreePoolWithTag(p_handle_list, POOL_TAG);
+                MemoryScanner::ScanMemoryRegions(p_process_list);
+
+                ExFreePoolWithTag(p_process_list, POOL_TAG);
             }
-
-            Scanner::ScanMemoryRegions(p_process_list);
-
-            ExFreePoolWithTag(p_process_list, POOL_TAG);
         }
     }
 }
 
-bool Scanner::Setup()
+bool MemoryScanner::Setup()
 {
     KeInitializeTimerEx(&g_state.scanner.timer, SynchronizationTimer);
 
@@ -70,12 +54,16 @@ bool Scanner::Setup()
 
     g_state.scanner.timer_set = true;
 
-    PsCreateSystemThread(&g_state.scanner.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    NTSTATUS status = PsCreateSystemThread(&g_state.scanner.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    if (NT_SUCCESS(status))
+    {
+        return true;
+    }
 
-    return true;
+    return false;
 }
 
-void Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
+void MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
 {
     if (!p_process_list)
     {
@@ -106,26 +94,26 @@ void Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
         return;
     }
 
-    MEMORY_BASIC_INFORMATION info = {};
     ULONG_PTR base_address = 0;
 
     do
     {
-        status = ZwQueryVirtualMemory(h_process, (PVOID)base_address, MemoryBasicInformation, &info, sizeof(info), nullptr);
+        MEMORY_BASIC_INFORMATION info = {};
+
+        status = ZwQueryVirtualMemory(h_process, reinterpret_cast<void*>(base_address), MemoryBasicInformation, &info, sizeof(info), nullptr);
         if (NT_SUCCESS(status))
         {
             PrintExecutableMemoryRegion(&info);
         }
 
         base_address += info.RegionSize;
-        RtlSecureZeroMemory(&info, sizeof(info));
 
     } while (NT_SUCCESS(status));
 
     ZwClose(h_process);
 }
 
-void Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
+void MemoryScanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -167,5 +155,29 @@ void Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info
     if (protect && type)
     {
         KdPrint(("Base Address: 0x%Ix, Page Protection: %ws, Type: %ws", p_info->BaseAddress, protect, type));
+    }
+}
+
+void MemoryScanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list)
+{
+    if (!p_process_list || !p_handle_list)
+    {
+        return;
+    }
+
+    KdPrint(("Processes with open handles to %ws:", g_state.target_process_name));
+
+    for (unsigned int i = 0; i < p_handle_list->NumberOfHandles; ++i)
+    {
+        const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
+
+        if (entry.Object == g_state.target_process)
+        {
+            const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
+            if (p_process)
+            {
+                KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
+            }
+        }
     }
 }
