@@ -96,7 +96,7 @@ bool Notifications::IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid,
 {
     if (!p_entry || !excluded_process_name)
     {
-        return;
+        return false;
     }
 
     // TODO: Perform some kind of integrity check here.
