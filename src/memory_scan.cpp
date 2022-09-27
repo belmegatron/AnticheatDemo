@@ -12,7 +12,7 @@ void MemoryScanRoutine(PVOID p_context)
 
     while (true)
     {
-        const NTSTATUS status = KeWaitForSingleObject(&g_state.timer, Executive, KernelMode, true, nullptr);
+        const NTSTATUS status = KeWaitForSingleObject(&g_state.scanner.timer, Executive, KernelMode, true, nullptr);
 
         if (NT_SUCCESS(status))
         {
@@ -20,7 +20,7 @@ void MemoryScanRoutine(PVOID p_context)
 
             if (g_state.target_pid == 0)
             {
-                KdPrint(("Aborting memory scan as %ws not running.", g_state.target_process_name));
+                KdPrint(("Aborting memory scan as %ws is not running.", g_state.target_process_name));
                 continue;
             }
 
@@ -28,7 +28,6 @@ void MemoryScanRoutine(PVOID p_context)
 
             if (!p_process_list)
             {
-                KdPrint(("Failed to perform initial process list when executing memory scan"));
                 continue;
             }
 
@@ -36,6 +35,8 @@ void MemoryScanRoutine(PVOID p_context)
 
             if (p_handle_list)
             {
+                KdPrint(("Processes with open handles to %ws:", g_state.target_process_name));
+
                 for (unsigned int i = 0; i < p_handle_list->NumberOfHandles; ++i)
                 {
                     const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
@@ -45,8 +46,7 @@ void MemoryScanRoutine(PVOID p_context)
                         const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
                         if (p_process)
                         {
-                            // TODO: Perform lookup on access values maybe?
-                            KdPrint(("Process: %wZ, Access: %x", p_process->ProcessName, entry.GrantedAccess));
+                            KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
                         }
                     }
                 }
@@ -61,17 +61,19 @@ void MemoryScanRoutine(PVOID p_context)
     }
 }
 
-void Scanner::Setup()
+bool Scanner::Setup()
 {
-    KeInitializeTimerEx(&g_state.timer, SynchronizationTimer);
+    KeInitializeTimerEx(&g_state.scanner.timer, SynchronizationTimer);
 
     const LARGE_INTEGER interval{ 0 , 0 };
-    KeSetTimerEx(&g_state.timer, interval, scanner_interval_ms, nullptr);
+    KeSetTimerEx(&g_state.scanner.timer, interval, scanner_interval_ms, nullptr);
 
-    PsCreateSystemThread(&g_state.scanner_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    PsCreateSystemThread(&g_state.scanner.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+
+    return true;
 }
 
-void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
+void Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
 {
     if (!p_process_list)
     {
@@ -83,12 +85,9 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
         return;
     }
 
-    KdPrint(("Starting memory region scan"));
-
     const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(g_state.target_pid));
     if (!p_process)
     {
-        KdPrint(("Unable to find target process when performing memory region scan: %x", g_state.target_pid));
         return;
     }
 
@@ -102,11 +101,8 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
     NTSTATUS status = ZwOpenProcess(&h_process, GENERIC_ALL, &attributes, &client_id);
     if (!NT_SUCCESS(status))
     {
-        KdPrint(("Unable to open handle to %ws: %x", g_state.target_process_name, status));
         return;
     }
-
-    KdPrint(("Obtained handle to target process"));
 
     MEMORY_BASIC_INFORMATION info = {};
     ULONG_PTR base_address = 0;
@@ -116,7 +112,7 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
         status = ZwQueryVirtualMemory(h_process, (PVOID)base_address, MemoryBasicInformation, &info, sizeof(info), nullptr);
         if (NT_SUCCESS(status))
         {
-            PrintMemoryAllocation(&info);
+            PrintExecutableMemoryRegion(&info);
         }
 
         base_address += info.RegionSize;
@@ -127,7 +123,7 @@ void Scanner::ScanMemoryRegions(PSYSTEM_PROCESSES p_process_list)
     ZwClose(h_process);
 }
 
-void Scanner::PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)
+void Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -151,24 +147,6 @@ void Scanner::PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)
     case PAGE_EXECUTE_WRITECOPY:
         protect = L"PAGE_EXECUTE_WRITECOPY";
         break;
-    case PAGE_READONLY:
-        protect = L"PAGE_READONLY";
-        break;
-    case PAGE_READWRITE:
-    case PAGE_READWRITE | PAGE_GUARD:
-        protect = L"PAGE_READWRITE";
-        break;
-    case PAGE_WRITECOPY:
-        protect = L"PAGE_WRITECOPY";
-        break;
-    case PAGE_NOACCESS:
-        protect = L"PAGE_NOACCESS";
-        break;
-    case NONE:
-        protect = L"";
-        break;
-    default:
-        protect = L"UNKNOWN";
     }
 
     switch (p_info->Type)
@@ -182,12 +160,10 @@ void Scanner::PrintMemoryAllocation(PMEMORY_BASIC_INFORMATION p_info)
     case MEM_IMAGE:
         type = L"MEM_IMAGE";
         break;
-    case FREE:
-        type = L"FREE";
-        break;
-    default:
-        type = L"UNKNOWN";
     }
 
-    KdPrint(("Base Address: 0x%Ix, Page Protection: %ws, Type: %ws", p_info->BaseAddress, protect, type));
+    if (protect && type)
+    {
+        KdPrint(("Base Address: 0x%Ix, Page Protection: %ws, Type: %ws", p_info->BaseAddress, protect, type));
+    }
 }

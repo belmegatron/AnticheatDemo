@@ -1,15 +1,14 @@
 #pragma once
 #include "nt_internals.h"
 
+// Stolen from winnt.h, included hear to avoid conflicts when including winnt.h and ntddk.h
+#define MEM_IMAGE 0x1000000
+
 namespace Scanner
 {
-    constexpr int MEM_IMAGE = 0x1000000;
-    constexpr int FREE = 0x0000000;
-    constexpr int NONE = 0x00;
-
     constexpr unsigned int scanner_interval_ms = 30000;
 
-    void Setup();
-    void ScanMemoryRegions(PSYSTEM_PROCESSES process_list);
-    void PrintMemoryAllocation(MEMORY_BASIC_INFORMATION* p_info);
+    bool Setup();
+    void ScanMemoryRegions(const PSYSTEM_PROCESSES process_list);
+    void PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info);
 }
