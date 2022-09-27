@@ -1,5 +1,5 @@
 #include "sysinfo.h"
-#include "globals.h"
+#include "common.h"
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 

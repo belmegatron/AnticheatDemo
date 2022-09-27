@@ -55,6 +55,8 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="include\common.cpp" />
+    <ClCompile Include="src\anticheat.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\memory_scan.cpp" />
     <ClCompile Include="src\process_notifications.cpp" />
@@ -62,7 +64,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\common.h" />
-    <ClInclude Include="include\globals.h" />
+    <ClInclude Include="include\anticheat.h" />
     <ClInclude Include="include\memory_scan.h" />
     <ClInclude Include="include\nt_internals.h" />
     <ClInclude Include="include\process_notifications.h" />

@@ -2,8 +2,6 @@
 #include "nt_internals.h"
 #include "common.h"
 
-#pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
-
 // Stolen from winnt.h, included hear to avoid conflicts when including winnt.h and ntddk.h
 #define MEM_IMAGE 0x1000000
 
@@ -14,6 +12,8 @@ namespace MemoryScanner
     class Scanner
     {
     private:
+        TargetProcess* mp_target_process;
+
         // Handle to memory scanner thread.
         HANDLE m_thread;
 
@@ -25,20 +25,12 @@ namespace MemoryScanner
         void PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list);
 
     public:
-        Scanner();
+        Scanner(TargetProcess* p_target_process);
         virtual ~Scanner();
 
+        void* operator new(size_t n);
+        void operator delete(void* p);
+
         void Scan();
-
-        void* operator new(size_t n)
-        {
-            void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
-            return p;
-        }
-
-        void operator delete(void* p)
-        {
-            ExFreePoolWithTag(p, POOL_TAG);
-        }
     };
 }

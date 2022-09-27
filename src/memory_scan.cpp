@@ -1,16 +1,17 @@
+#include "anticheat.h"
 #include "memory_scan.h"
-#include "globals.h"
 #include "sysinfo.h"
 
+#pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-extern GlobalState g_state;
+extern AntiCheat* gp_anticheat;
 
 void MemoryScanRoutine(PVOID p_context)
 {
     UNREFERENCED_PARAMETER(p_context);
 
     // TODO: DriverUnload needs to signal this thread to terminate.
-    g_state.p_scanner->Scan();
+    gp_anticheat->mp_scanner->Scan();
 }
 
 void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
@@ -20,18 +21,18 @@ void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process
         return;
     }
 
-    if (g_state.target_pid == 0)
+    if (mp_target_process->pid == 0)
     {
         return;
     }
 
-    const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(g_state.target_pid));
+    const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->pid));
     if (!p_process)
     {
         return;
     }
 
-    CLIENT_ID client_id = { g_state.target_pid, 0 };
+    CLIENT_ID client_id = { mp_target_process->pid, 0 };
 
     OBJECT_ATTRIBUTES attributes = {};
     InitializeObjectAttributes(&attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
@@ -115,13 +116,13 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
         return;
     }
 
-    KdPrint(("Processes with open handles to %ws:", g_state.target_process_name));
+    KdPrint(("Processes with open handles to %ws:", mp_target_process->name));
 
     for (unsigned int i = 0; i < p_handle_list->NumberOfHandles; ++i)
     {
         const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
 
-        if (entry.Object == g_state.target_process)
+        if (entry.Object == mp_target_process->p_process)
         {
             const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
             if (p_process)
@@ -132,10 +133,8 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
     }
 }
 
-MemoryScanner::Scanner::Scanner()
+MemoryScanner::Scanner::Scanner(TargetProcess* p_target_process) : mp_target_process(p_target_process)
 {
-    KdPrint(("Scanner constructor called"));
-
     KeInitializeTimerEx(&m_timer, SynchronizationTimer);
 
     const LARGE_INTEGER interval{ 0 , 0 };
@@ -146,7 +145,6 @@ MemoryScanner::Scanner::Scanner()
 
 MemoryScanner::Scanner::~Scanner()
 {
-    KdPrint(("Scanner destructor called"));
     KeCancelTimer(&m_timer);
 }
 
@@ -160,17 +158,17 @@ void MemoryScanner::Scanner::Scan()
         {
             KdPrint(("Executing memory scan routine."));
 
-            if (g_state.target_pid == 0)
+            if (mp_target_process->pid == 0)
             {
-                KdPrint(("Aborting memory scan as %ws is not running.", g_state.target_process_name));
+                KdPrint(("Aborting memory scan as %ws is not running.", mp_target_process->name));
                 continue;
             }
 
-            PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
+            const PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
 
             if (p_process_list)
             {
-                PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
+                const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
 
                 if (p_handle_list)
                 {
@@ -185,4 +183,15 @@ void MemoryScanner::Scanner::Scan()
             }
         }
     }
+}
+
+void* MemoryScanner::Scanner::operator new(size_t n)
+{
+    void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
+    return p;
+}
+
+void MemoryScanner::Scanner::operator delete(void* p)
+{
+    ExFreePoolWithTag(p, POOL_TAG);
 }
