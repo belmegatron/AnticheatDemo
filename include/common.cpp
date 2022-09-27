@@ -17,7 +17,7 @@ void TargetProcess::operator delete(void* p)
     ExFreePoolWithTag(p, POOL_TAG);
 }
 
-const PWCHAR& TargetProcess::get_name()
+const PWCHAR& TargetProcess::get_name() const
 {
     return m_name;
 }
@@ -27,7 +27,7 @@ void TargetProcess::set_name(const PWCHAR name)
     m_name = name;
 }
 
-const HANDLE& TargetProcess::get_pid()
+const HANDLE& TargetProcess::get_pid() const
 {
     return m_pid;
 }
@@ -37,7 +37,7 @@ void TargetProcess::set_pid(const HANDLE pid)
     m_pid = pid;
 }
 
-const PEPROCESS& TargetProcess::get_process()
+const PEPROCESS& TargetProcess::get_process() const
 {
     return mp_process;
 }

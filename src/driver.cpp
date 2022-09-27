@@ -1,6 +1,6 @@
 #include "nt_internals.h"
 #include "anticheat.h"
-#include "process_notifications.h"
+#include "process_monitor.h"
 #include "memory_scan.h"
 
 AntiCheat* gp_anticheat = nullptr;

@@ -1,5 +1,5 @@
 #include "anticheat.h"
-#include "process_notifications.h"
+#include "process_monitor.h"
 #include "sysinfo.h"
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
@@ -8,16 +8,16 @@ extern AntiCheat* gp_anticheat;
 
 OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION p_info)
 {
-    gp_anticheat->mp_notifier->OnPreOpenProcess(p_info);
+    gp_anticheat->mp_monitor->OnPreOpenProcess(p_info);
     return OB_PREOP_SUCCESS;
 }
 
 void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info)
 {
-    gp_anticheat->mp_notifier->OnProcessNotify(p_process, process_id, p_create_info);
+    gp_anticheat->mp_monitor->OnProcessNotify(p_process, process_id, p_create_info);
 }
 
-void ProcessNotifications::Notifier::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
+void ProcessMonitor::Monitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -39,7 +39,7 @@ void ProcessNotifications::Notifier::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFO
     }
 }
 
-bool ProcessNotifications::Notifier::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
+bool ProcessMonitor::Monitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
 {
     bool matches = false;
 
@@ -62,7 +62,7 @@ bool ProcessNotifications::Notifier::ProcessEntryMatchesNameAndPID(const PSYSTEM
     return matches;
 }
 
-ProcessNotifications::Notifier::Notifier(TargetProcess* p_target_process) : 
+ProcessMonitor::Monitor::Monitor(TargetProcess* p_target_process) : 
     mp_target_process(p_target_process), 
     m_notification_set(false), 
     mp_callback_reg_handle(nullptr)
@@ -97,7 +97,7 @@ ProcessNotifications::Notifier::Notifier(TargetProcess* p_target_process) :
     ObRegisterCallbacks(&reg, &mp_callback_reg_handle);
 }
 
-ProcessNotifications::Notifier::~Notifier()
+ProcessMonitor::Monitor::~Monitor()
 {
     if (m_notification_set)
     {
@@ -110,18 +110,18 @@ ProcessNotifications::Notifier::~Notifier()
     }
 }
 
-void* ProcessNotifications::Notifier::operator new(size_t n)
+void* ProcessMonitor::Monitor::operator new(size_t n)
 {
     void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
     return p;
 }
 
-void ProcessNotifications::Notifier::operator delete(void* p)
+void ProcessMonitor::Monitor::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
 }
 
-void ProcessNotifications::Notifier::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
+void ProcessMonitor::Monitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -186,7 +186,7 @@ void ProcessNotifications::Notifier::OnPreOpenProcess(POB_PRE_OPERATION_INFORMAT
     }
 }
 
-void ProcessNotifications::Notifier::OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info)
+void ProcessMonitor::Monitor::OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info)
 {
     if (p_create_info)
     {

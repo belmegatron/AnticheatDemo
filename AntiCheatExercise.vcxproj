@@ -59,7 +59,7 @@
     <ClCompile Include="src\anticheat.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\memory_scan.cpp" />
-    <ClCompile Include="src\process_notifications.cpp" />
+    <ClCompile Include="src\process_monitor.cpp" />
     <ClCompile Include="src\sysinfo.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -67,7 +67,7 @@
     <ClInclude Include="include\anticheat.h" />
     <ClInclude Include="include\memory_scan.h" />
     <ClInclude Include="include\nt_internals.h" />
-    <ClInclude Include="include\process_notifications.h" />
+    <ClInclude Include="include\process_monitor.h" />
     <ClInclude Include="include\sysinfo.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

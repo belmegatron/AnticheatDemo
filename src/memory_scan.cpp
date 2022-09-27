@@ -133,7 +133,7 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
     }
 }
 
-MemoryScanner::Scanner::Scanner(TargetProcess* p_target_process) : mp_target_process(p_target_process)
+MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) : mp_target_process(p_target_process)
 {
     KeInitializeTimerEx(&m_timer, SynchronizationTimer);
 

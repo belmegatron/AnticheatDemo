@@ -22,12 +22,12 @@ public:
     void* operator new(size_t n);
     void operator delete(void* p);
 
-    const PWCHAR& get_name();
+    const PWCHAR& get_name() const;
     void set_name(const PWCHAR name);
 
-    const HANDLE& get_pid();
+    const HANDLE& get_pid() const;
     void set_pid(const HANDLE pid);
 
-    const PEPROCESS& get_process();
+    const PEPROCESS& get_process() const;
     void set_process(const PEPROCESS process);
 };

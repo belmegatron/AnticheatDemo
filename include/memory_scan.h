@@ -12,7 +12,9 @@ namespace MemoryScanner
     class Scanner
     {
     private:
-        TargetProcess* mp_target_process;
+
+        // Contains details on the target process that we are protecting.
+        const TargetProcess* mp_target_process;
 
         // Handle to memory scanner thread.
         HANDLE m_thread;
@@ -25,7 +27,7 @@ namespace MemoryScanner
         void PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list);
 
     public:
-        Scanner(TargetProcess* p_target_process);
+        Scanner(const TargetProcess* p_target_process);
         virtual ~Scanner();
 
         void* operator new(size_t n);

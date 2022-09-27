@@ -2,18 +2,18 @@
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-AntiCheat::AntiCheat() : mp_target_process(nullptr), mp_scanner(nullptr), mp_notifier(nullptr)
+AntiCheat::AntiCheat() : mp_target_process(nullptr), mp_scanner(nullptr), mp_monitor(nullptr)
 {
     mp_target_process = new(TargetProcess);
-    mp_notifier = new(ProcessNotifications::Notifier)(mp_target_process);
+    mp_monitor = new(ProcessMonitor::Monitor)(mp_target_process);
     mp_scanner = new(MemoryScanner::Scanner)(mp_target_process);
 }
 
 AntiCheat::~AntiCheat()
 {
-    if (mp_notifier)
+    if (mp_monitor)
     {
-        delete(mp_notifier);
+        delete(mp_monitor);
     }
 
     if (mp_scanner)
