@@ -39,35 +39,43 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
     }
 }
 
-NTSTATUS Notifications::Setup()
+bool Notifications::Setup()
 {
+    bool success = false;
+
     NTSTATUS status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, false);
 
-    // TODO: Need to keep a record of this in global state.
-    if (!NT_SUCCESS(status))
+    if (NT_SUCCESS(status))
     {
-        return status;
+        g_state.process_notification_set = true;
+
+        OB_OPERATION_REGISTRATION operations[] =
+        {
+            {
+                PsProcessType,
+                OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE,
+                ::OnPreOpenProcess, nullptr
+            }
+        };
+
+        OB_CALLBACK_REGISTRATION reg =
+        {
+            OB_FLT_REGISTRATION_VERSION,
+            1,
+            RTL_CONSTANT_STRING(L"1337.1337"),
+            nullptr,
+            operations
+        };
+
+        status = ObRegisterCallbacks(&reg, &g_state.callback_reg_handle);
+
+        if (NT_SUCCESS(status))
+        {
+            success = true;
+        }
     }
 
-    OB_OPERATION_REGISTRATION operations[] = 
-    {
-        {
-            PsProcessType,
-            OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE,
-            ::OnPreOpenProcess, nullptr
-        }
-    };
-
-    OB_CALLBACK_REGISTRATION reg = 
-    {
-        OB_FLT_REGISTRATION_VERSION,
-        1,
-        RTL_CONSTANT_STRING(L"1337.1337"),
-        nullptr,
-        operations
-    };
-
-    return ObRegisterCallbacks(&reg, &g_state.reg_handle);
+    return success;
 }
 
 void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
@@ -92,16 +100,16 @@ void Notifications::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
     }
 }
 
-bool Notifications::IsExcluded(PSYSTEM_PROCESSES p_entry, HANDLE requesting_pid, const wchar_t* excluded_process_name)
+bool Notifications::IsExcluded(const PSYSTEM_PROCESSES p_entry, const HANDLE requesting_pid, const wchar_t* excluded_process_name)
 {
+    bool excluded = false;
+
     if (!p_entry || !excluded_process_name)
     {
-        return false;
+        return excluded;
     }
 
     // TODO: Perform some kind of integrity check here.
-
-    bool excluded = false;
 
     if (p_entry->ProcessName.Length)
     {
@@ -178,7 +186,6 @@ void Notifications::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 
         ExFreePoolWithTag(p_process_list, POOL_TAG);
 
-        // TODO: Would be nice to specify who we denied access to.
         if (!excluded)
         {
             RemoveRWMemoryAccess(p_info);
