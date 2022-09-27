@@ -136,10 +136,12 @@ MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) :
     mp_target_process(p_target_process),
     m_thread(nullptr),
     m_timer({}),
-    m_terminate_scan({})
+    m_terminate_request({}),
+    m_terminate_response({})
 {
     KeInitializeTimerEx(&m_timer, SynchronizationTimer);
-    KeInitializeEvent(&m_terminate_scan, NotificationEvent, false);
+    KeInitializeEvent(&m_terminate_request, NotificationEvent, false);
+    KeInitializeEvent(&m_terminate_response, NotificationEvent, false);
 
     const LARGE_INTEGER interval{ 0 , 0 };
     KeSetTimerEx(&m_timer, interval, scanner_interval_ms, nullptr);
@@ -149,8 +151,11 @@ MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) :
 
 MemoryScanner::Scanner::~Scanner()
 {
-    // Waits for scanning thread to terminate.
-    KeSetEvent(&m_terminate_scan, 0, true);
+    // Signal our scanning thread to terminate.
+    KeSetEvent(&m_terminate_request, 0, true);
+
+    // Wait for scanning thread to terminate.
+    KeWaitForSingleObject(&m_terminate_response, Executive, KernelMode, false, nullptr);
 
     // Close handle to thread.
     ZwClose(m_thread);
@@ -161,15 +166,15 @@ MemoryScanner::Scanner::~Scanner()
 
 void MemoryScanner::Scanner::Scan()
 {
-    void* waitables[2] = { &m_terminate_scan, &m_timer};
+    void* waitables[2] = { &m_terminate_request, &m_timer};
 
     while (true)
     {
-        const NTSTATUS status = KeWaitForMultipleObjects(2, waitables, WaitAny, Executive, KernelMode, true, nullptr, nullptr);
-
+        const NTSTATUS status = KeWaitForMultipleObjects(2, waitables, WaitAny, Executive, KernelMode, false, nullptr, nullptr);
         if (status == STATUS_WAIT_0)
         {
             KdPrint(("Terminating scanning thread."));
+            KeSetEvent(&m_terminate_response, 0, false);
             return;
         }
         else if (status == STATUS_WAIT_1)

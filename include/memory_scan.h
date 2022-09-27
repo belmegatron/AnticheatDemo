@@ -23,7 +23,10 @@ namespace MemoryScanner
         KTIMER m_timer;
 
         // Signalled when we wish to stop scanning.
-        KEVENT m_terminate_scan;
+        KEVENT m_terminate_request;
+
+        // Signalled immediately before we terminate the scanning thread.
+        KEVENT m_terminate_response;
 
         void ScanMemoryRegions(const PSYSTEM_PROCESSES process_list);
         void PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info);
