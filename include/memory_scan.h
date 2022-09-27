@@ -22,6 +22,9 @@ namespace MemoryScanner
         // Timer used to schedule memory scans.
         KTIMER m_timer;
 
+        // Signalled when we wish to stop scanning.
+        KEVENT m_terminate_scan;
+
         void ScanMemoryRegions(const PSYSTEM_PROCESSES process_list);
         void PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info);
         void PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list);

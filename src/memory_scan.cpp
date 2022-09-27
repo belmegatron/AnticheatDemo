@@ -10,7 +10,6 @@ void MemoryScanRoutine(PVOID p_context)
 {
     UNREFERENCED_PARAMETER(p_context);
 
-    // TODO: DriverUnload needs to signal this thread to terminate.
     gp_anticheat->mp_scanner->Scan();
 }
 
@@ -133,9 +132,14 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
     }
 }
 
-MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) : mp_target_process(p_target_process)
+MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) : 
+    mp_target_process(p_target_process),
+    m_thread(nullptr),
+    m_timer({}),
+    m_terminate_scan({})
 {
     KeInitializeTimerEx(&m_timer, SynchronizationTimer);
+    KeInitializeEvent(&m_terminate_scan, NotificationEvent, false);
 
     const LARGE_INTEGER interval{ 0 , 0 };
     KeSetTimerEx(&m_timer, interval, scanner_interval_ms, nullptr);
@@ -145,14 +149,23 @@ MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) : mp_targ
 
 MemoryScanner::Scanner::~Scanner()
 {
+    // Waits for scanning thread to terminate.
+    KeSetEvent(&m_terminate_scan, 0, true);
+
+    // Close handle to thread.
+    ZwClose(m_thread);
+
+    // Cancel the timer we were using for scheduling our scans.
     KeCancelTimer(&m_timer);
 }
 
 void MemoryScanner::Scanner::Scan()
 {
+    void* waitables[2] = { &m_timer, &m_terminate_scan };
+
     while (true)
     {
-        const NTSTATUS status = KeWaitForSingleObject(&m_timer, Executive, KernelMode, true, nullptr);
+        const NTSTATUS status = KeWaitForMultipleObjects(2, waitables, WaitAny, Executive, KernelMode, true, nullptr, nullptr);
 
         if (NT_SUCCESS(status))
         {
