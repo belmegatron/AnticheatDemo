@@ -12,7 +12,7 @@ void MemoryScanRoutine(PVOID p_context)
 
     while (true)
     {
-        const NTSTATUS status = KeWaitForSingleObject(&g_state.scanner.timer, Executive, KernelMode, true, nullptr);
+        const NTSTATUS status = KeWaitForSingleObject(&g_state.timer, Executive, KernelMode, true, nullptr);
 
         if (NT_SUCCESS(status))
         {
@@ -63,12 +63,12 @@ void MemoryScanRoutine(PVOID p_context)
 
 bool Scanner::Setup()
 {
-    KeInitializeTimerEx(&g_state.scanner.timer, SynchronizationTimer);
+    KeInitializeTimerEx(&g_state.timer, SynchronizationTimer);
 
     const LARGE_INTEGER interval{ 0 , 0 };
-    KeSetTimerEx(&g_state.scanner.timer, interval, scanner_interval_ms, nullptr);
+    KeSetTimerEx(&g_state.timer, interval, scanner_interval_ms, nullptr);
 
-    PsCreateSystemThread(&g_state.scanner.thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    PsCreateSystemThread(&g_state.scanner_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
 
     return true;
 }

@@ -8,8 +8,6 @@ struct GlobalState
     // This is the process we are going to protect.
     PWCHAR target_process_name;
 
-    // TODO: Need a mutex here!
-
     // PID of target process.
     HANDLE target_pid;
 
@@ -17,7 +15,7 @@ struct GlobalState
     PEPROCESS target_process;
 
     // Registration handle for ObRegisterCallbacks.
-    void* reg_handle;
+    void* callback_reg_handle;
 
     // Handle to memory scanner thread.
     HANDLE scanner_thread;
@@ -30,7 +28,7 @@ struct GlobalState
         target_process_name = L"notepad.exe";
         target_pid = 0;
         target_process = nullptr;
-        reg_handle = nullptr;
+        callback_reg_handle = nullptr;
         scanner_thread = nullptr;
         timer = {};
     };

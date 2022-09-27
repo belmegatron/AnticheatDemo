@@ -70,7 +70,7 @@ void DriverUnload(PDRIVER_OBJECT p_driver_object)
 
     KeCancelTimer(&g_state.timer);
 
-    ObUnRegisterCallbacks(g_state.reg_handle);
+    ObUnRegisterCallbacks(g_state.callback_reg_handle);
 
     PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, true);
 
