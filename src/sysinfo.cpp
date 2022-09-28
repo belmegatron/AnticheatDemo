@@ -3,7 +3,7 @@
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-PSYSTEM_PROCESSES SysInfo::ProcessList()
+PSYSTEM_PROCESSES AntiCheat::ProcessList()
 {
     NTSTATUS status = STATUS_INVALID_HANDLE;
 
@@ -32,7 +32,7 @@ PSYSTEM_PROCESSES SysInfo::ProcessList()
     return reinterpret_cast<PSYSTEM_PROCESSES>(buf);
 }
 
-PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
+PSYSTEM_HANDLE_INFORMATION_EX  AntiCheat::HandleList()
 {
     NTSTATUS status = STATUS_INVALID_HANDLE;
     
@@ -61,7 +61,7 @@ PSYSTEM_HANDLE_INFORMATION_EX  SysInfo::HandleList()
     return reinterpret_cast<PSYSTEM_HANDLE_INFORMATION_EX>(buf);
 }
 
-PSYSTEM_PROCESSES SysInfo::FindProcess(const PSYSTEM_PROCESSES p_process_list, ULONG_PTR pid)
+PSYSTEM_PROCESSES AntiCheat::FindProcess(const PSYSTEM_PROCESSES p_process_list, ULONG_PTR pid)
 {
     if (!p_process_list)
     {

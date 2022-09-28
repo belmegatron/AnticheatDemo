@@ -56,7 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="include\common.cpp" />
-    <ClCompile Include="src\anticheat.cpp" />
+    <ClCompile Include="src\engine.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\memory_scan.cpp" />
     <ClCompile Include="src\process_monitor.cpp" />
@@ -64,7 +64,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\common.h" />
-    <ClInclude Include="include\anticheat.h" />
+    <ClInclude Include="include\engine.h" />
     <ClInclude Include="include\memory_scan.h" />
     <ClInclude Include="include\nt_internals.h" />
     <ClInclude Include="include\process_monitor.h" />

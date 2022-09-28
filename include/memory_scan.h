@@ -5,11 +5,11 @@
 // Stolen from winnt.h, included hear to avoid conflicts when including winnt.h and ntddk.h
 #define MEM_IMAGE 0x1000000
 
-namespace MemoryScanner
+namespace AntiCheat
 {
     constexpr unsigned int scanner_interval_ms = 30000;
 
-    class Scanner
+    class MemoryScanner
     {
     private:
 
@@ -33,8 +33,8 @@ namespace MemoryScanner
         void PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list);
 
     public:
-        Scanner(const TargetProcess* p_target_process);
-        virtual ~Scanner();
+        MemoryScanner(const TargetProcess* p_target_process);
+        virtual ~MemoryScanner();
 
         void* operator new(size_t n);
         void operator delete(void* p);

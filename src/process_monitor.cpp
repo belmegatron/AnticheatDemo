@@ -1,10 +1,10 @@
-#include "anticheat.h"
+#include "engine.h"
 #include "process_monitor.h"
 #include "sysinfo.h"
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-extern AntiCheat* gp_anticheat;
+extern AntiCheat::Engine* gp_anticheat;
 
 OB_PREOP_CALLBACK_STATUS OnPreOpenProcess(PVOID, POB_PRE_OPERATION_INFORMATION p_info)
 {
@@ -17,7 +17,7 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
     gp_anticheat->mp_monitor->OnProcessNotify(p_process, process_id, p_create_info);
 }
 
-void ProcessMonitor::Monitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
+void AntiCheat::ProcessMonitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -39,7 +39,7 @@ void ProcessMonitor::Monitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION
     }
 }
 
-bool ProcessMonitor::Monitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
+bool AntiCheat::ProcessMonitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
 {
     bool matches = false;
 
@@ -62,7 +62,7 @@ bool ProcessMonitor::Monitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCES
     return matches;
 }
 
-ProcessMonitor::Monitor::Monitor(TargetProcess* p_target_process) : 
+AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
     mp_target_process(p_target_process), 
     m_notification_set(false), 
     mp_callback_reg_handle(nullptr)
@@ -97,7 +97,7 @@ ProcessMonitor::Monitor::Monitor(TargetProcess* p_target_process) :
     ObRegisterCallbacks(&reg, &mp_callback_reg_handle);
 }
 
-ProcessMonitor::Monitor::~Monitor()
+AntiCheat::ProcessMonitor::~ProcessMonitor()
 {
     if (m_notification_set)
     {
@@ -110,18 +110,18 @@ ProcessMonitor::Monitor::~Monitor()
     }
 }
 
-void* ProcessMonitor::Monitor::operator new(size_t n)
+void* AntiCheat::ProcessMonitor::operator new(size_t n)
 {
     void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
     return p;
 }
 
-void ProcessMonitor::Monitor::operator delete(void* p)
+void AntiCheat::ProcessMonitor::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
 }
 
-void ProcessMonitor::Monitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
+void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -153,7 +153,7 @@ void ProcessMonitor::Monitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_i
 
     bool allow_access = false;
 
-    const PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
+    const PSYSTEM_PROCESSES p_process_list = ProcessList();
 
     if (p_process_list)
     {
@@ -186,7 +186,7 @@ void ProcessMonitor::Monitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_i
     }
 }
 
-void ProcessMonitor::Monitor::OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info)
+void AntiCheat::ProcessMonitor::OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info)
 {
     if (p_create_info)
     {

@@ -3,31 +3,51 @@
 
 #define POOL_TAG 'ca'
 
-class TargetProcess
+namespace AntiCheat
 {
-private:
-    // This is the process we are going to protect.
-    PWCHAR m_name;
+    enum class InitializationError
+    {
+        success,
+        unknown,
+        set_notify_routine,
+        register_callbacks,
+        create_scanner_thread
+    };
 
-    // PID of target process.
-    HANDLE m_pid;
+    struct Error
+    {
+        InitializationError code;
+        NTSTATUS status;
 
-    // Pointer to target process.
-    PEPROCESS mp_process;
+        Error() : code(InitializationError::success), status(STATUS_SUCCESS) {}
+    };
 
-public:
-    TargetProcess();
-    virtual ~TargetProcess() = default;
+    class TargetProcess
+    {
+    private:
+        // This is the process we are going to protect.
+        PWCHAR m_name;
 
-    void* operator new(size_t n);
-    void operator delete(void* p);
+        // PID of target process.
+        HANDLE m_pid;
 
-    const PWCHAR& get_name() const;
-    void set_name(const PWCHAR name);
+        // Pointer to target process.
+        PEPROCESS mp_process;
 
-    const HANDLE& get_pid() const;
-    void set_pid(const HANDLE pid);
+    public:
+        TargetProcess();
+        virtual ~TargetProcess() = default;
 
-    const PEPROCESS& get_process() const;
-    void set_process(const PEPROCESS process);
-};
+        void* operator new(size_t n);
+        void operator delete(void* p);
+
+        const PWCHAR& get_name() const;
+        void set_name(const PWCHAR name);
+
+        const HANDLE& get_pid() const;
+        void set_pid(const HANDLE pid);
+
+        const PEPROCESS& get_process() const;
+        void set_process(const PEPROCESS process);
+    };
+}

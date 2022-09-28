@@ -1,9 +1,9 @@
 #include "nt_internals.h"
-#include "anticheat.h"
+#include "engine.h"
 #include "process_monitor.h"
 #include "memory_scan.h"
 
-AntiCheat* gp_anticheat = nullptr;
+AntiCheat::Engine* gp_anticheat = nullptr;
 
 constexpr UNICODE_STRING device_name = RTL_CONSTANT_STRING(L"\\Device\\AntiCheatDemo");
 constexpr UNICODE_STRING symlink = RTL_CONSTANT_STRING(L"\\??\\AntiCheatDemo");
@@ -27,7 +27,7 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
         status = IoCreateSymbolicLink(const_cast<PUNICODE_STRING>(&symlink), const_cast<PUNICODE_STRING>(&device_name));
         if (NT_SUCCESS(status))
         {
-            gp_anticheat = new(AntiCheat);
+            gp_anticheat = new(AntiCheat::Engine);
             KdPrint(("Loaded AntiCheat Driver."));
         }
         else

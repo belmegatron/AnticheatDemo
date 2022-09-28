@@ -1,15 +1,15 @@
-#include "anticheat.h"
+#include "engine.h"
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-AntiCheat::AntiCheat() : mp_target_process(nullptr), mp_scanner(nullptr), mp_monitor(nullptr)
+AntiCheat::Engine::Engine() : 
+    mp_target_process(new(TargetProcess)), 
+    mp_scanner(new(MemoryScanner)(mp_target_process)),
+    mp_monitor(new(ProcessMonitor)(mp_target_process))
 {
-    mp_target_process = new(TargetProcess);
-    mp_monitor = new(ProcessMonitor::Monitor)(mp_target_process);
-    mp_scanner = new(MemoryScanner::Scanner)(mp_target_process);
 }
 
-AntiCheat::~AntiCheat()
+AntiCheat::Engine::~Engine()
 {
     if (mp_monitor)
     {
@@ -27,13 +27,13 @@ AntiCheat::~AntiCheat()
     }
 }
 
-void* AntiCheat::operator new(size_t n)
+void* AntiCheat::Engine::operator new(size_t n)
 {
     void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
     return p;
 }
 
-void AntiCheat::operator delete(void* p)
+void AntiCheat::Engine::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
 }

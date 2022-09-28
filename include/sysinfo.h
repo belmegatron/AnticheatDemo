@@ -1,7 +1,7 @@
 #pragma once
 #include "nt_internals.h"
 
-namespace SysInfo
+namespace AntiCheat
 {
     PSYSTEM_PROCESSES ProcessList();
     PSYSTEM_HANDLE_INFORMATION_EX  HandleList();

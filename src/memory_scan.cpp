@@ -1,10 +1,10 @@
-#include "anticheat.h"
+#include "engine.h"
 #include "memory_scan.h"
 #include "sysinfo.h"
 
 #pragma warning ( disable : 4996 ) // ExAllocatePoolWithTag is deprecated.
 
-extern AntiCheat* gp_anticheat;
+extern AntiCheat::Engine* gp_anticheat;
 
 void MemoryScanRoutine(PVOID p_context)
 {
@@ -13,7 +13,7 @@ void MemoryScanRoutine(PVOID p_context)
     gp_anticheat->mp_scanner->Scan();
 }
 
-void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
+void AntiCheat::MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process_list)
 {
     if (!p_process_list)
     {
@@ -25,7 +25,7 @@ void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process
         return;
     }
 
-    const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->get_pid()));
+    const PSYSTEM_PROCESSES p_process = FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->get_pid()));
     if (!p_process)
     {
         return;
@@ -63,7 +63,7 @@ void MemoryScanner::Scanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_process
     ZwClose(h_process);
 }
 
-void MemoryScanner::Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
+void AntiCheat::MemoryScanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -108,7 +108,7 @@ void MemoryScanner::Scanner::PrintExecutableMemoryRegion(const PMEMORY_BASIC_INF
     }
 }
 
-void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list)
+void AntiCheat::MemoryScanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCESSES p_process_list, const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list)
 {
     if (!p_process_list || !p_handle_list)
     {
@@ -123,7 +123,7 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
 
         if (entry.Object == mp_target_process->get_process())
         {
-            const PSYSTEM_PROCESSES p_process = SysInfo::FindProcess(p_process_list, entry.UniqueProcessId);
+            const PSYSTEM_PROCESSES p_process = FindProcess(p_process_list, entry.UniqueProcessId);
             if (p_process)
             {
                 KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
@@ -132,7 +132,7 @@ void MemoryScanner::Scanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PROCE
     }
 }
 
-MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) : 
+AntiCheat::MemoryScanner::MemoryScanner(const TargetProcess* p_target_process) :
     mp_target_process(p_target_process),
     m_thread(nullptr),
     m_timer({}),
@@ -149,7 +149,7 @@ MemoryScanner::Scanner::Scanner(const TargetProcess* p_target_process) :
     PsCreateSystemThread(&m_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
 }
 
-MemoryScanner::Scanner::~Scanner()
+AntiCheat::MemoryScanner::~MemoryScanner()
 {
     // Signal our scanning thread to terminate.
     KeSetEvent(&m_terminate_request, 0, true);
@@ -164,7 +164,7 @@ MemoryScanner::Scanner::~Scanner()
     KeCancelTimer(&m_timer);
 }
 
-void MemoryScanner::Scanner::Scan()
+void AntiCheat::MemoryScanner::Scan()
 {
     void* waitables[2] = { &m_terminate_request, &m_timer};
 
@@ -187,11 +187,11 @@ void MemoryScanner::Scanner::Scan()
                 continue;
             }
 
-            const PSYSTEM_PROCESSES p_process_list = SysInfo::ProcessList();
+            const PSYSTEM_PROCESSES p_process_list = ProcessList();
 
             if (p_process_list)
             {
-                const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo::HandleList();
+                const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = HandleList();
 
                 if (p_handle_list)
                 {
@@ -208,13 +208,13 @@ void MemoryScanner::Scanner::Scan()
     }
 }
 
-void* MemoryScanner::Scanner::operator new(size_t n)
+void* AntiCheat::MemoryScanner::operator new(size_t n)
 {
     void* const p = ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
     return p;
 }
 
-void MemoryScanner::Scanner::operator delete(void* p)
+void AntiCheat::MemoryScanner::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
 }
