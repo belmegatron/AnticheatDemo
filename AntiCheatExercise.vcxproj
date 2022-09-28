@@ -55,7 +55,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="include\common.cpp" />
+    <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\engine.cpp" />
     <ClCompile Include="src\driver.cpp" />
     <ClCompile Include="src\memory_scan.cpp" />
