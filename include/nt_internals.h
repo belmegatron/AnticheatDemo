@@ -86,8 +86,7 @@ typedef enum _MEMORY_INFORMATION_CLASS {
 } MEMORY_INFORMATION_CLASS;
 
 extern "C"
-NTSTATUS
-ZwQuerySystemInformation(
+NTSTATUS ZwQuerySystemInformation(
     SYSTEM_INFORMATION_CLASS SystemInformationClass,
     PVOID SystemInformation,
     ULONG SystemInformationLength,
@@ -101,4 +100,13 @@ NTSTATUS ZwQueryVirtualMemory(
     PVOID                    MemoryInformation,
     SIZE_T                   MemoryInformationLength,
     PSIZE_T                  ReturnLength
+);
+
+extern "C"
+NTSTATUS ZwQueryInformationProcess(
+    HANDLE           ProcessHandle,
+    PROCESSINFOCLASS ProcessInformationClass,
+    PVOID            ProcessInformation,
+    ULONG            ProcessInformationLength,
+    PULONG           ReturnLength
 );

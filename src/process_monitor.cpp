@@ -39,6 +39,55 @@ void AntiCheat::ProcessMonitor::DenyRWMemoryAccess(POB_PRE_OPERATION_INFORMATION
     }
 }
 
+bool AntiCheat::ProcessMonitor::VerifyRequestingProcess(const PSYSTEM_PROCESSES p_requesting_process)
+{
+    CLIENT_ID client_id = { reinterpret_cast<HANDLE>(p_requesting_process->ProcessId), 0 };
+
+    OBJECT_ATTRIBUTES process_attributes = {};
+    InitializeObjectAttributes(&process_attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
+
+    HANDLE h_process = INVALID_HANDLE_VALUE;
+
+    // Open a handle to the requesting process.
+    NTSTATUS status = ZwOpenProcess(&h_process, GENERIC_ALL, &process_attributes, &client_id);
+    if (NT_ERROR(status))
+    {
+        return false;
+    }
+
+    // Get the image file path.
+    const PUNICODE_STRING p_image_file_path = ProcessInfo<UNICODE_STRING>(h_process, ProcessImageFileName);
+    if (!p_image_file_path)
+    {
+        ZwClose(h_process);
+        return false;
+    }
+
+    HANDLE h_file = INVALID_HANDLE_VALUE;
+
+    OBJECT_ATTRIBUTES file_attributes = {};
+    InitializeObjectAttributes(&file_attributes, nullptr, OBJ_KERNEL_HANDLE, nullptr, nullptr);
+    file_attributes.ObjectName = p_image_file_path;
+
+    IO_STATUS_BLOCK io_status_block = {};
+
+    status = ZwCreateFile(&h_file, FILE_READ_ACCESS, &file_attributes, &io_status_block, nullptr, 0, FILE_SHARE_READ, FILE_OPEN, 0, nullptr, 0);
+    if (NT_ERROR(status))
+    {
+        ZwClose(h_process);
+        ExFreePoolWithTag(p_image_file_path, POOL_TAG);
+        return false;
+    }
+
+    KdPrint(("Successfully opened file"));
+
+    ZwClose(h_file);
+    ZwClose(h_process);
+    ExFreePoolWithTag(p_image_file_path, POOL_TAG);
+
+    return true;
+}
+
 AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
     mp_target_process(p_target_process), 
     m_notification_set(false), 
@@ -165,6 +214,7 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
         {
             if (wcsstr(process_name, allowed_processes[i]))
             {
+                VerifyRequestingProcess(p_requesting_process);
                 KdPrint(("Allowed %ws", process_name));
                 allowed_process = true;
                 break;
