@@ -12,7 +12,6 @@ AntiCheat::TargetProcess::TargetProcess() :
 void* AntiCheat::TargetProcess::operator new(size_t n)
 {
     return ExAllocatePoolWithTag(PagedPool, n, POOL_TAG);
-
 }
 
 void AntiCheat::TargetProcess::operator delete(void* p)

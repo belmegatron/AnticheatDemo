@@ -20,11 +20,13 @@ void AntiCheat::MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_proce
         return;
     }
 
+    // Check target process is running.
     if (mp_target_process->get_pid() == 0)
     {
         return;
     }
 
+    // Check we can find our target process in the process list.
     const PSYSTEM_PROCESSES p_process = FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(mp_target_process->get_pid()));
     if (!p_process)
     {
@@ -38,14 +40,16 @@ void AntiCheat::MemoryScanner::ScanMemoryRegions(const PSYSTEM_PROCESSES p_proce
 
     HANDLE h_process = INVALID_HANDLE_VALUE;
 
+    // Open a handle to our target process.
     NTSTATUS status = ZwOpenProcess(&h_process, GENERIC_ALL, &attributes, &client_id);
-    if (!NT_SUCCESS(status))
+    if (NT_ERROR(status))
     {
         return;
     }
 
     ULONG_PTR base_address = 0;
 
+    // Scan over all memory regions, printing info on only those that are executable.
     do
     {
         MEMORY_BASIC_INFORMATION info = {};
@@ -121,13 +125,16 @@ void AntiCheat::MemoryScanner::PrintHandlesOpenToTargetProcess(const PSYSTEM_PRO
     {
         const SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX entry = p_handle_list->Handles[i];
 
-        if (entry.Object == mp_target_process->get_process())
+        // Check if the object associated with the handle entry is our target process.
+        if (entry.Object != mp_target_process->get_process())
         {
-            const PSYSTEM_PROCESSES p_process = FindProcess(p_process_list, entry.UniqueProcessId);
-            if (p_process)
-            {
-                KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
-            }
+            continue;
+        }
+
+        const PSYSTEM_PROCESSES p_process = FindProcess(p_process_list, entry.UniqueProcessId);
+        if (p_process)
+        {
+            KdPrint(("Name: %wZ, Access: 0x%x", p_process->ProcessName, entry.GrantedAccess));
         }
     }
 }

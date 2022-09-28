@@ -26,31 +26,36 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
     {
         return status;
     }
+
     status = IoCreateSymbolicLink(const_cast<PUNICODE_STRING>(&symlink), const_cast<PUNICODE_STRING>(&device_name));
     if (NT_ERROR(status))
     {
-        IoDeleteDevice(p_driver_object->DeviceObject);
+        IoDeleteDevice(p_device_object);
         return status;
     }
 
     gp_anticheat = new(AntiCheat::Engine);
-
-
-    if (gp_anticheat)
+    if (!gp_anticheat)
     {
-        // Check that the engine was initialized correctly.
-        const bool success = gp_anticheat->Initialized();
-        if (!success)
-        {
-            delete(gp_anticheat);
-            gp_anticheat = nullptr;
-            IoDeleteDevice(p_driver_object->DeviceObject);
-            IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
-            return STATUS_DRIVER_UNABLE_TO_LOAD;
-        }
+        IoDeleteDevice(p_device_object);
+        IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
+        return STATUS_DRIVER_UNABLE_TO_LOAD;
     }
 
-    KdPrint(("Loaded AntiCheat Driver"));
+    // Check that the engine was initialized correctly.
+    const bool success = gp_anticheat->Initialized();
+    if (!success)
+    {
+        delete(gp_anticheat);
+        gp_anticheat = nullptr;
+
+        IoDeleteDevice(p_device_object);
+        IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
+
+        return STATUS_DRIVER_UNABLE_TO_LOAD;
+    }
+
+    KdPrint(("Loaded Driver."));
    
     return status;
 }
@@ -77,5 +82,5 @@ void DriverUnload(PDRIVER_OBJECT p_driver_object)
     IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
     IoDeleteDevice(p_driver_object->DeviceObject);
 
-    KdPrint(("Unloaded AntiCheat Driver"));
+    KdPrint(("Unloaded Driver."));
 }

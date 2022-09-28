@@ -41,25 +41,27 @@ void AntiCheat::ProcessMonitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATI
 
 bool AntiCheat::ProcessMonitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
 {
-    bool matches = false;
-
     if (!p_entry || !name)
     {
-        return matches;
+        return false;
     }
 
-    if (p_entry->ProcessName.Length)
+    if (!p_entry->ProcessName.Length)
     {
-        if (wcsstr(p_entry->ProcessName.Buffer, name))
-        {
-            if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == pid)
-            {
-                matches = true;
-            }
-        }
+        return false;
     }
 
-    return matches;
+    if (wcsstr(p_entry->ProcessName.Buffer, name))
+    {
+        return false;
+    }
+
+    if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == pid)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
@@ -101,7 +103,6 @@ AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
     {
         mp_initialization_error.code = InitializationError::register_callbacks;
         mp_initialization_error.status = status;
-        return;
     }
 }
 
@@ -158,7 +159,7 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
 
     const HANDLE requesting_pid = PsGetCurrentProcessId();
 
-    // Ignore cases where the process requesting access to our target process, is the target process.
+    // Ignore cases where the target process is requesting some kind of access to itself.
     if (requesting_pid == mp_target_process->get_pid())
     {
         return;
@@ -203,28 +204,36 @@ void AntiCheat::ProcessMonitor::OnProcessNotify(PEPROCESS p_process, HANDLE proc
 {
     if (p_create_info)
     {
-        if (wcsstr(p_create_info->CommandLine->Buffer, mp_target_process->get_name()) != nullptr)
+        // Check if it's a notification regarding our target process.
+        if (wcsstr(p_create_info->CommandLine->Buffer, mp_target_process->get_name()) == nullptr)
         {
-            if (mp_target_process->get_pid() != 0)
-            {
-                p_create_info->CreationStatus = STATUS_ACCESS_DENIED;
-                return;
-            }
-
-            mp_target_process->set_pid(process_id);
-            mp_target_process->set_process(p_process);
-
-            KdPrint(("%ws has started.", mp_target_process->get_name()));
+            return;
         }
+
+        // If the PID isn't 0, it means we are already protecting our target process. For the purposes of this demo, we will only allow allow one process to run 
+        // that matches the name of our target executable.
+        if (mp_target_process->get_pid() != 0)
+        {
+            p_create_info->CreationStatus = STATUS_ACCESS_DENIED;
+            return;
+        }
+
+        mp_target_process->set_pid(process_id);
+        mp_target_process->set_process(p_process);
+
+        KdPrint(("%ws has started.", mp_target_process->get_name()));
     }
     else
     {
-        if (mp_target_process->get_pid() == process_id)
+        // Check it if it's our target process that has stopped.
+        if (mp_target_process->get_pid() != process_id)
         {
-            KdPrint(("%ws has stopped", mp_target_process->get_name()));
-            mp_target_process->set_pid(0);
-            mp_target_process->set_process(nullptr);
+            return;
         }
+
+        KdPrint(("%ws has stopped", mp_target_process->get_name()));
+        mp_target_process->set_pid(0);
+        mp_target_process->set_process(nullptr);
     }
 }
 

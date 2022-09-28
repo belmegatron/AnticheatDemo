@@ -43,12 +43,14 @@ bool AntiCheat::Engine::Initialized()
     Error err = mp_monitor->Initialized();
     if (err.code != InitializationError::success)
     {
+        KdPrint(("ProcessMonitor failed to initialize due to initialization error: %i, NTSTATUS: 0x%x", err.code, err.status));
         return false;
     }
     
     err = mp_scanner->Initialized();
     if (err.code != InitializationError::success)
     {
+        KdPrint(("MemoryScanner failed to initialize due to initialization error: %i, NTSTATUS: 0x%x", err.code, err.status));
         return false;
     }
 
