@@ -24,7 +24,7 @@ PSYSTEM_PROCESSES AntiCheat::ProcessList()
 
     } while (status == STATUS_INFO_LENGTH_MISMATCH);
 
-    if (!NT_SUCCESS(status) && buf)
+    if (NT_ERROR(status) && buf)
     {
         ExFreePoolWithTag(buf, POOL_TAG);
     }
@@ -53,7 +53,7 @@ PSYSTEM_HANDLE_INFORMATION_EX  AntiCheat::HandleList()
 
     } while (status == STATUS_INFO_LENGTH_MISMATCH);
 
-    if (!NT_SUCCESS(status) && buf)
+    if (NT_ERROR(status) && buf)
     {
         ExFreePoolWithTag(buf, POOL_TAG);
     }
