@@ -6,9 +6,9 @@
 class AntiCheat
 {
 public:
-    TargetProcess* mp_target_process;
-    ProcessMonitor::Monitor* mp_monitor;
-    MemoryScanner::Scanner* mp_scanner;
+    TargetProcess* const mp_target_process;
+    ProcessMonitor::Monitor* const mp_monitor;
+    MemoryScanner::Scanner* const mp_scanner;
 
     AntiCheat();
     virtual ~AntiCheat();
