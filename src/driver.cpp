@@ -35,15 +35,19 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT p_driver_object, PUNICODE_STRING 
 
     gp_anticheat = new(AntiCheat::Engine);
 
-    // Check that the engine was initialized correctly.
-    bool driver_initialized = gp_anticheat->Initialized();
-    if (!driver_initialized)
+
+    if (gp_anticheat)
     {
-        delete(gp_anticheat);
-        gp_anticheat = nullptr;
-        IoDeleteDevice(p_driver_object->DeviceObject);
-        IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
-        return STATUS_DRIVER_UNABLE_TO_LOAD;
+        // Check that the engine was initialized correctly.
+        const bool success = gp_anticheat->Initialized();
+        if (!success)
+        {
+            delete(gp_anticheat);
+            gp_anticheat = nullptr;
+            IoDeleteDevice(p_driver_object->DeviceObject);
+            IoDeleteSymbolicLink(const_cast<PUNICODE_STRING>(&symlink));
+            return STATUS_DRIVER_UNABLE_TO_LOAD;
+        }
     }
 
     KdPrint(("Loaded AntiCheat Driver"));
