@@ -25,7 +25,7 @@ namespace AntiCheat
         // Registration handle for ObRegisterCallbacks.
         void* mp_callback_reg_handle;
 
-        void RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info);
+        void DenyRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info);
 
     public:
         ProcessMonitor(TargetProcess* p_target_process);

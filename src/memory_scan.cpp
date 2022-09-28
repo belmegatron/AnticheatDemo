@@ -207,11 +207,11 @@ void AntiCheat::MemoryScanner::Scan()
                 continue;
             }
 
-            const PSYSTEM_PROCESSES p_process_list = ProcessList();
+            const PSYSTEM_PROCESSES p_process_list = SysInfo<SYSTEM_PROCESSES>(SystemProcessInformation);
 
             if (p_process_list)
             {
-                const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = HandleList();
+                const PSYSTEM_HANDLE_INFORMATION_EX p_handle_list = SysInfo<SYSTEM_HANDLE_INFORMATION_EX>(SystemExtendedHandleInformation);
 
                 if (p_handle_list)
                 {

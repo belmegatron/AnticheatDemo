@@ -140,7 +140,7 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
         return;
     }
 
-    const PSYSTEM_PROCESSES p_process_list = ProcessList();
+    const PSYSTEM_PROCESSES p_process_list = SysInfo<SYSTEM_PROCESSES>(SystemProcessInformation);
 
     if (p_process_list)
     {
