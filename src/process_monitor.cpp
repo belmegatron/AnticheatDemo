@@ -156,8 +156,9 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
 
         constexpr size_t allowed_process_count = 2;
 
-        // TODO: In a real life scenario, we would do some additional verification here. We would get the path to the actual PE used to launch this process (NtQueryInformationProcess)
-        // and then verify the PE. As it stands, an attacker could launch a process with one of the below names and be granted RW memory access.
+        // In a real life scenario, we would do some additional verification here. We would get the path to the actual PE used to launch this process (ZwQueryInformationProcess with ProcessImageFileName)
+        // Open a handle to the file (ZwCreateFile) and then use a Crypt provider to perform a hash of the file content and perform a lookup against a list of known hashes.
+
         const PWCHAR allowed_processes[allowed_process_count] = { L"csrss.exe", L"explorer.exe" };
 
         for (unsigned int i = 0; i < allowed_process_count; ++i)
