@@ -165,7 +165,6 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
         {
             if (wcsstr(process_name, allowed_processes[i]))
             {
-                KdPrint(("Allowed %ws", process_name));
                 allowed_process = true;
                 break;
             }
