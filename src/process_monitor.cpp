@@ -17,7 +17,7 @@ void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_I
     gp_anticheat->mp_monitor->OnProcessNotify(p_process, process_id, p_create_info);
 }
 
-void AntiCheat::ProcessMonitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
+void AntiCheat::ProcessMonitor::DenyRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info)
 {
     if (!p_info)
     {
@@ -134,7 +134,7 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
 
     const HANDLE requesting_pid = PsGetCurrentProcessId();
 
-    // Ignore cases where the target process is requesting some kind of access to itself.
+    // Ignore cases where the target process is requesting access to itself.
     if (requesting_pid == mp_target_process->get_pid())
     {
         return;
@@ -144,13 +144,18 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
 
     if (p_process_list)
     {
-        PSYSTEM_PROCESSES p_requesting_process = FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(requesting_pid));
+        const PSYSTEM_PROCESSES p_requesting_process = FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(requesting_pid));
+        if (!p_requesting_process)
+        {
+            return;
+        }
+
         const PWCHAR process_name = p_requesting_process->ProcessName.MaximumLength > 0 ? p_requesting_process->ProcessName.Buffer : L"";
         
         bool allowed_process = false;
 
         constexpr size_t allowed_process_count = 2;
-        PWCHAR allowed_processes[allowed_process_count] = { L"csrss.exe", L"explorer.exe" };
+        const PWCHAR allowed_processes[allowed_process_count] = { L"csrss.exe", L"explorer.exe" };
 
         for (unsigned int i = 0; i < allowed_process_count; ++i)
         {
@@ -163,7 +168,7 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
 
         if (!allowed_process)
         {
-            RemoveRWMemoryAccess(p_info);
+            DenyRWMemoryAccess(p_info);
         }
 
         ExFreePoolWithTag(p_process_list, POOL_TAG);
@@ -180,7 +185,7 @@ void AntiCheat::ProcessMonitor::OnProcessNotify(PEPROCESS p_process, HANDLE proc
             return;
         }
 
-        // If the PID isn't 0, it means we are already protecting our target process. For the purposes of this demo, we will only allow allow one process to run 
+        // If the PID isn't 0, it means we are already protecting a process. For the purposes of this demo, we will only allow allow one process to run 
         // that matches the name of our target executable.
         if (mp_target_process->get_pid() != 0)
         {
