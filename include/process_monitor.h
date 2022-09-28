@@ -26,7 +26,6 @@ namespace AntiCheat
         void* mp_callback_reg_handle;
 
         void RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATION p_info);
-        bool ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid);
 
     public:
         ProcessMonitor(TargetProcess* p_target_process);

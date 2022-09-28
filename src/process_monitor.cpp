@@ -39,31 +39,6 @@ void AntiCheat::ProcessMonitor::RemoveRWMemoryAccess(POB_PRE_OPERATION_INFORMATI
     }
 }
 
-bool AntiCheat::ProcessMonitor::ProcessEntryMatchesNameAndPID(const PSYSTEM_PROCESSES p_entry, const wchar_t* name, const HANDLE pid)
-{
-    if (!p_entry || !name)
-    {
-        return false;
-    }
-
-    if (!p_entry->ProcessName.Length)
-    {
-        return false;
-    }
-
-    if (wcsstr(p_entry->ProcessName.Buffer, name))
-    {
-        return false;
-    }
-
-    if (reinterpret_cast<HANDLE>(p_entry->ProcessId) == pid)
-    {
-        return true;
-    }
-
-    return false;
-}
-
 AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
     mp_target_process(p_target_process), 
     m_notification_set(false), 
@@ -165,38 +140,33 @@ void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p
         return;
     }
 
-    bool allow_access = false;
-
     const PSYSTEM_PROCESSES p_process_list = ProcessList();
 
     if (p_process_list)
     {
-        PSYSTEM_PROCESSES p_entry = p_process_list;
+        PSYSTEM_PROCESSES p_requesting_process = FindProcess(p_process_list, reinterpret_cast<ULONG_PTR>(requesting_pid));
+        const PWCHAR process_name = p_requesting_process->ProcessName.MaximumLength > 0 ? p_requesting_process->ProcessName.Buffer : L"";
+        
+        bool allowed_process = false;
 
-        do
+        constexpr size_t allowed_process_count = 2;
+        PWCHAR allowed_processes[allowed_process_count] = { L"csrss.exe", L"explorer.exe" };
+
+        for (unsigned int i = 0; i < allowed_process_count; ++i)
         {
-            allow_access = ProcessEntryMatchesNameAndPID(p_entry, L"csrss.exe", requesting_pid);
-            if (allow_access)
+            if (wcsstr(process_name, allowed_processes[i]))
             {
+                allowed_process = true;
                 break;
             }
+        }
 
-            allow_access = ProcessEntryMatchesNameAndPID(p_entry, L"explorer.exe", requesting_pid);
-            if (allow_access)
-            {
-                break;
-            }
-
-            p_entry = reinterpret_cast<PSYSTEM_PROCESSES>(reinterpret_cast<char*>(p_entry) + p_entry->NextEntryDelta);
-
-        } while (p_entry->NextEntryDelta);
-
-        ExFreePoolWithTag(p_process_list, POOL_TAG);
-
-        if (!allow_access)
+        if (!allowed_process)
         {
             RemoveRWMemoryAccess(p_info);
         }
+
+        ExFreePoolWithTag(p_process_list, POOL_TAG);
     }
 }
 
