@@ -12,6 +12,8 @@ namespace AntiCheat
     class MemoryScanner
     {
     private:
+        // This is set if we encounter an error in the constructor.
+        Error mp_initialization_error;
 
         // Contains details on the target process that we are protecting.
         const TargetProcess* mp_target_process;
@@ -39,6 +41,7 @@ namespace AntiCheat
         void* operator new(size_t n);
         void operator delete(void* p);
 
+        Error Initialized();
         void Scan();
     };
 }

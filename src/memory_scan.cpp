@@ -146,22 +146,35 @@ AntiCheat::MemoryScanner::MemoryScanner(const TargetProcess* p_target_process) :
     const LARGE_INTEGER interval{ 0 , 0 };
     KeSetTimerEx(&m_timer, interval, scanner_interval_ms, nullptr);
 
-    PsCreateSystemThread(&m_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    NTSTATUS status = PsCreateSystemThread(&m_thread, GENERIC_ALL, nullptr, nullptr, nullptr, MemoryScanRoutine, nullptr);
+    if (NT_ERROR(status))
+    {
+        mp_initialization_error.code = InitializationError::create_scanner_thread;
+        mp_initialization_error.status = status;
+    }
 }
 
 AntiCheat::MemoryScanner::~MemoryScanner()
 {
-    // Signal our scanning thread to terminate.
-    KeSetEvent(&m_terminate_request, 0, true);
+    if (m_thread)
+    {
+        // Signal our scanning thread to terminate.
+        KeSetEvent(&m_terminate_request, 0, true);
 
-    // Wait for scanning thread to terminate.
-    KeWaitForSingleObject(&m_terminate_response, Executive, KernelMode, false, nullptr);
+        // Wait for scanning thread to terminate.
+        KeWaitForSingleObject(&m_terminate_response, Executive, KernelMode, false, nullptr);
 
-    // Close handle to thread.
-    ZwClose(m_thread);
+        // Close handle to thread.
+        ZwClose(m_thread);
+    }
 
     // Cancel the timer we were using for scheduling our scans.
     KeCancelTimer(&m_timer);
+}
+
+AntiCheat::Error AntiCheat::MemoryScanner::Initialized()
+{
+    return mp_initialization_error;
 }
 
 void AntiCheat::MemoryScanner::Scan()

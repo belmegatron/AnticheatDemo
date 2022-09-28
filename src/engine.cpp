@@ -37,3 +37,20 @@ void AntiCheat::Engine::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
 }
+
+bool AntiCheat::Engine::Initialized()
+{
+    Error err = mp_monitor->Initialized();
+    if (err.code != InitializationError::success)
+    {
+        return false;
+    }
+    
+    err = mp_scanner->Initialized();
+    if (err.code != InitializationError::success)
+    {
+        return false;
+    }
+
+    return true;
+}

@@ -69,8 +69,10 @@ AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
 {
     NTSTATUS status = PsSetCreateProcessNotifyRoutineEx(::OnProcessNotify, false);
 
-    if (!NT_SUCCESS(status))
+    if (NT_ERROR(status))
     {
+        mp_initialization_error.code = InitializationError::set_notify_routine;
+        mp_initialization_error.status = status;
         return;
     }
 
@@ -94,7 +96,13 @@ AntiCheat::ProcessMonitor::ProcessMonitor(TargetProcess* p_target_process) :
         operations
     };
 
-    ObRegisterCallbacks(&reg, &mp_callback_reg_handle);
+    status = ObRegisterCallbacks(&reg, &mp_callback_reg_handle);
+    if (NT_ERROR(status))
+    {
+        mp_initialization_error.code = InitializationError::register_callbacks;
+        mp_initialization_error.status = status;
+        return;
+    }
 }
 
 AntiCheat::ProcessMonitor::~ProcessMonitor()
@@ -119,6 +127,11 @@ void* AntiCheat::ProcessMonitor::operator new(size_t n)
 void AntiCheat::ProcessMonitor::operator delete(void* p)
 {
     ExFreePoolWithTag(p, POOL_TAG);
+}
+
+AntiCheat::Error AntiCheat::ProcessMonitor::Initialized()
+{
+    return mp_initialization_error;
 }
 
 void AntiCheat::ProcessMonitor::OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info)

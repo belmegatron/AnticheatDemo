@@ -25,7 +25,7 @@ namespace AntiCheat
     class TargetProcess
     {
     private:
-        // This is the process we are going to protect.
+        // Name of the target process.
         PWCHAR m_name;
 
         // PID of target process.

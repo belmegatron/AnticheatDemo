@@ -13,6 +13,8 @@ namespace AntiCheat
     class ProcessMonitor
     {
     private:
+        // This is set if we encounter an error in the constructor.
+        Error mp_initialization_error;
 
         // Contains details on the target process that we are protecting.
         TargetProcess* mp_target_process;
@@ -33,6 +35,7 @@ namespace AntiCheat
         void* operator new(size_t n);
         void operator delete(void* p);
 
+        Error Initialized();
         void OnPreOpenProcess(POB_PRE_OPERATION_INFORMATION p_info);
         void OnProcessNotify(PEPROCESS p_process, HANDLE process_id, PPS_CREATE_NOTIFY_INFO p_create_info);
     };
